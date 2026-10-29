@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'unsafe-inline'; script-src 'self'"
+    />
+    <title>Clueless</title>
+    <style>
+      :root {
+        --bg: rgba(18, 18, 20, 0.82);
+        --fg: #e8e8ea;
+        --muted: #8d8d96;
+        --accent: #6aa6ff;
+        --them: #ffb86a;
+      }
+      * { box-sizing: border-box; margin: 0; }
+      html, body { height: 100%; }
+      body {
+        font: 13px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+        color: var(--fg);
+        background: transparent;
+        /* The window is click-through except where explicitly re-enabled. */
+        -webkit-user-select: none;
+        cursor: default;
+      }
+      /* Liquid Glass.
+         macOS 26 has a native NSGlassEffectView, but Electron cannot reach
+         AppKit, so this approximates it: a translucent gradient over a strong
+         backdrop blur with saturation boost, a bright inset rim to read as a
+         specular edge, and a deep soft shadow to lift it off the desktop. */
+      #panel {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        /* Dark glass base. A light translucent panel looked correct in
+           isolation but made the light body text unreadable whenever the
+           desktop behind was bright — which, over a white document or a Teams
+           call with a light background, is most of the time. The highlights
+           below supply the glass character without sacrificing contrast. */
+        background:
+          linear-gradient(180deg, rgba(28, 28, 32, 0.86) 0%, rgba(18, 18, 22, 0.82) 55%,
+                          rgba(14, 14, 17, 0.88) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 20px;
+        backdrop-filter: blur(34px) saturate(180%);
+        -webkit-backdrop-filter: blur(34px) saturate(180%);
+        box-shadow:
+          0 20px 56px rgba(0, 0, 0, 0.46),
+          0 2px 8px rgba(0, 0, 0, 0.28),
+          inset 0 1px 0 rgba(255, 255, 255, 0.26),
+          inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+        overflow: hidden;
+        position: relative;
+      }
+      /* Reads as the panel hanging from the notch. */
+      #notch-tab {
+        position: absolute;
+        top: 0; left: 50%;
+        transform: translateX(-50%);
+        width: 108px; height: 5px;
+        border-radius: 0 0 6px 6px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.08));
+        pointer-events: none;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 14px 16px 11px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+        -webkit-app-region: drag;
+      }
+      #dot {
+        width: 7px; height: 7px; border-radius: 50%;
+        background: var(--muted);
+      }
+      #dot.live { background: #4ad07a; }
+      /* Pulsing while speech is detected but not yet transcribed. */
+      #dot.speaking {
+        background: var(--accent);
+        animation: pulse 1.1s ease-in-out infinite;
+      }
+      @keyframes pulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.45); opacity: 0.55; }
+      }
+      #title { font-weight: 600; font-size: 12px; letter-spacing: 0.2px; }
+      #hint { margin-left: auto; color: var(--muted); font-size: 11px; }
+      #body { flex: 1; overflow-y: auto; padding: 14px 16px 16px; }
+      .placeholder { color: var(--muted); line-height: 1.7; }
+      .placeholder strong { color: var(--fg); font-weight: 600; }
+      kbd {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 10.5px; padding: 1px 5px; border-radius: 4px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: var(--fg);
+      }
+      footer {
+        display: flex; align-items: center; gap: 10px;
+        padding: 9px 16px;
+        border-top: 1px solid rgba(255, 255, 255, 0.07);
+        font-size: 10.5px; color: var(--muted);
+      }
+      footer .key { display: inline-flex; align-items: center; gap: 4px; }
+      #foot-status { margin-left: auto; }
+      footer.sources {
+        border-top: none; padding-top: 0; padding-bottom: 11px; gap: 12px;
+      }
+      .src[hidden] { display: none; }
+      .src-label {
+        font-size: 9px; text-transform: uppercase; letter-spacing: 0.7px;
+      }
+      .src {
+        display: inline-flex; align-items: center; gap: 4px;
+        opacity: 0.4; transition: opacity 0.12s ease;
+      }
+      /* Off by default; an enabled source is the only one that is legible. */
+      .src.on { opacity: 1; color: var(--fg); }
+      .src.on::before {
+        content: '●'; color: #4ad07a; font-size: 8px; margin-right: 1px;
+      }
+      .src:not(.on)::before {
+        content: '○'; font-size: 8px; margin-right: 1px;
+      }
+      .turn { margin-bottom: 9px; line-height: 1.55; }
+      .turn .who { color: var(--accent); font-weight: 600; }
+      .turn.them .who { color: var(--them); }
+      #answer {
+        border-top: 1px solid rgba(255, 255, 255, 0.07);
+        padding: 13px 16px;
+        max-height: 45%;
+        overflow-y: auto;
+        display: none;
+      }
+      #answer.visible { display: block; }
+      #answer-text {
+        font-size: 13.5px; line-height: 1.6;
+        animation: fade-in 0.18s ease-out;
+      }
+      @keyframes fade-in {
+        from { opacity: 0; transform: translateY(2px); }
+        to { opacity: 1; transform: none; }
+      }
+      #answer h4 {
+        font-size: 10px; text-transform: uppercase; letter-spacing: 0.7px;
+        color: var(--muted); margin-bottom: 4px; font-weight: 600;
+      }
+      #answer-question:not(:empty) {
+        font-size: 11px; color: var(--muted); margin-bottom: 6px;
+        font-style: italic; line-height: 1.35;
+      }
+      /* Blinking caret while tokens stream in. */
+      #answer-text.streaming::after {
+        content: '▋'; color: var(--accent);
+        animation: blink 1s steps(2, start) infinite;
+      }
+      @keyframes blink { to { visibility: hidden; } }
+      #answer-citations:not(:empty) { margin-top: 8px; }
+      .citations-label {
+        font-size: 9px; text-transform: uppercase; letter-spacing: 0.7px;
+        color: var(--muted); margin-bottom: 3px;
+      }
+      .citation {
+        font-size: 11px; color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      ::-webkit-scrollbar { width: 7px; }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.14); border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="panel">
+      <div id="notch-tab"></div>
+      <header>
+        <div id="dot"></div>
+        <div id="title">Clueless</div>
+        <div id="hint">⌘⇧\ to ask</div>
+      </header>
+      <div id="body">
+        <div class="placeholder" id="placeholder">
+          <strong>Listening.</strong><br />
+          Press <kbd>⌘⇧\</kbd> to ask about whatever was just said.
+        </div>
+      </div>
+      <div id="answer">
+        <h4>Answer</h4>
+        <div id="answer-question"></div>
+        <div id="answer-text"></div>
+        <div id="answer-citations"></div>
+      </div>
+      <footer>
+        <span class="key"><kbd>⌘⇧\</kbd> ask</span>
+        <span class="key"><kbd>⌘⇧S</kbd> summary</span>
+        <span class="key"><kbd>⌘⇧H</kbd> hide</span>
+        <span id="foot-status">starting…</span>
+      </footer>
+      <footer class="sources">
+        <span class="src-label">context</span>
+        <span class="src" data-source="jira"><kbd>⌘⇧1</kbd> jira</span>
+        <span class="src" data-source="confluence"><kbd>⌘⇧2</kbd> wiki</span>
+        <span class="src" data-source="code"><kbd>⌘⇧3</kbd> code</span>
+        <span class="src" data-source="screen"><kbd>⌘⇧4</kbd> screen</span>
+      </footer>
+    </div>
+    <script src="renderer.js"></script>
+  </body>
+</html>

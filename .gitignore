@@ -1,0 +1,49 @@
+# ── Credentials ─────────────────────────────────────────────────────────────
+# Never commit. .env.example documents the expected keys.
+.env
+.env.*
+!.env.example
+
+# ── Local state and generated data ──────────────────────────────────────────
+# vector index (regenerable, large)
+.chroma/
+# repo clones, CA bundle, settings.json, askpass helper
+.cache/
+*.log
+*.sqlite
+*.db
+
+# ── Build output ────────────────────────────────────────────────────────────
+native/build/
+overlay/dist/
+overlay/out/
+
+# ── Dependencies ────────────────────────────────────────────────────────────
+overlay/node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# ── Native / editor / OS noise ──────────────────────────────────────────────
+.DS_Store
+*.swp
+.idea/
+.vscode/
+*.xcuserstate
+xcuserdata/
+
+# ── Transcripts ─────────────────────────────────────────────────────────────
+# The app keeps transcripts in memory only. This guards against someone
+# exporting one into the working tree by hand.
+meeting-summary-*.md
+
+# ── Local working notes ─────────────────────────────────────────────────────
+# AGENTS.md and PLAN.md record findings specific to one organisation (Jira site,
+# board IDs, account names). Keep them local; README/SETUP are the public docs.
+AGENTS.md
+PLAN.md
+
+# Stray build artifact from an older layout
+native/audiotap

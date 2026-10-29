@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'unsafe-inline'; script-src 'self'; connect-src http://127.0.0.1:8766"
+    />
+    <title>Clueless Settings</title>
+    <style>
+      :root {
+        --bg: #17171a;
+        --card: #1f1f24;
+        --fg: #e9e9ec;
+        --muted: #93939d;
+        --accent: #6aa6ff;
+        --border: rgba(255, 255, 255, 0.1);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; padding: 24px 26px 96px;
+        font: 13px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+        color: var(--fg); background: var(--bg);
+      }
+      h1 { font-size: 17px; margin: 0 0 4px; }
+      .sub { color: var(--muted); margin: 0 0 22px; font-size: 12px; }
+      section {
+        background: var(--card); border: 1px solid var(--border);
+        border-radius: 12px; padding: 16px 18px; margin-bottom: 14px;
+      }
+      section h2 {
+        font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px;
+        color: var(--muted); margin: 0 0 12px; font-weight: 600;
+      }
+      label { display: block; margin-bottom: 12px; }
+      label span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+      input[type="text"], select {
+        width: 100%; padding: 8px 10px; border-radius: 8px;
+        background: #121215; color: var(--fg);
+        border: 1px solid var(--border); font-size: 13px;
+      }
+      input:focus, select:focus { outline: none; border-color: var(--accent); }
+      .hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+      .row { display: flex; gap: 12px; }
+      .row > label { flex: 1; }
+      .toggle { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+      .toggle input { width: 16px; height: 16px; }
+      footer {
+        position: fixed; left: 0; right: 0; bottom: 0;
+        display: flex; align-items: center; gap: 12px;
+        padding: 14px 26px; background: #121215;
+        border-top: 1px solid var(--border);
+      }
+      button {
+        padding: 8px 16px; border-radius: 8px; font-size: 13px;
+        border: 1px solid var(--border); background: #24242a; color: var(--fg);
+        cursor: pointer;
+      }
+      button.primary { background: var(--accent); border-color: var(--accent); color: #08111f; font-weight: 600; }
+      button:disabled { opacity: 0.5; cursor: default; }
+      #status { color: var(--muted); font-size: 12px; margin-left: auto; }
+      .version { color: var(--muted); font-size: 11px; }
+    </style>
+  </head>
+  <body>
+    <h1>Clueless Settings</h1>
+    <p class="sub">
+      Everything runs locally. Credentials live in <code>.env</code> and are never
+      edited from this window.
+    </p>
+
+    <section>
+      <h2>Mode</h2>
+      <div class="toggle">
+        <input type="checkbox" id="DEVELOPER_MODE" />
+        <label for="DEVELOPER_MODE" style="margin: 0">
+          <span style="color: var(--fg); margin: 0">Developer mode</span>
+        </label>
+      </div>
+      <p class="hint">
+        Off = general meeting assistant (transcript + screen). On = adds Jira,
+        Confluence and code context.
+      </p>
+    </section>
+
+    <section>
+      <h2>Jira &amp; Confluence</h2>
+      <div class="row">
+        <label>
+          <span>Jira site</span>
+          <input type="text" id="JIRA_SITE" placeholder="yourcompany.atlassian.net" />
+        </label>
+        <label>
+          <span>Project key</span>
+          <input type="text" id="JIRA_PROJECT_KEY" placeholder="PROJ" />
+        </label>
+      </div>
+      <div class="row">
+        <label>
+          <span>Board ID (optional)</span>
+          <input type="text" id="JIRA_BOARD_ID" placeholder="1234" />
+        </label>
+        <label>
+          <span>Confluence spaces</span>
+          <input type="text" id="CONFLUENCE_SPACES" placeholder="ENG, DOCS" />
+        </label>
+      </div>
+      <p class="hint">Comma-separated. Leave blank to skip Confluence.</p>
+    </section>
+
+    <section>
+      <h2>Code (optional)</h2>
+      <div class="row">
+        <label>
+          <span>GitHub org</span>
+          <input type="text" id="GITHUB_ORG" placeholder="your-org" />
+        </label>
+        <label>
+          <span>GitHub account</span>
+          <input type="text" id="GITHUB_ACCOUNT" placeholder="(uses gh auth if blank)" />
+        </label>
+      </div>
+      <label>
+        <span>Repositories</span>
+        <input type="text" id="GITHUB_REPOS" placeholder="repo-a, repo-b" />
+      </label>
+    </section>
+
+    <section>
+      <h2>Speech</h2>
+      <label>
+        <span>Recognition locale</span>
+        <select id="SPEECH_LOCALE">
+          <option value="en-US">English (US)</option>
+          <option value="en-GB">English (UK)</option>
+          <option value="en-IN">English (India)</option>
+          <option value="en-AU">English (Australia)</option>
+          <option value="en-CA">English (Canada)</option>
+          <option value="en-IE">English (Ireland)</option>
+          <option value="en-NZ">English (New Zealand)</option>
+          <option value="en-SG">English (Singapore)</option>
+        </select>
+      </label>
+      <label>
+        <span>Custom vocabulary corrections</span>
+        <input type="text" id="CLUELESS_CORRECTIONS" placeholder="metformin=Metformin, hipaa=HIPAA" />
+      </label>
+      <p class="hint">
+        <code>heard=correct</code> pairs, comma-separated. Teach it names, drug
+        names, or acronyms it keeps mishearing.
+      </p>
+    </section>
+
+    <footer>
+      <button class="primary" id="save">Save</button>
+      <button id="cancel">Cancel</button>
+      <span id="status"></span>
+      <span class="version" id="version"></span>
+    </footer>
+    <script src="settings.js"></script>
+  </body>
+</html>

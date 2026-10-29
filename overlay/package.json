@@ -1,0 +1,54 @@
+{
+  "name": "clueless-overlay",
+  "productName": "Clueless",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Local-only meeting assistant — transcribes on-device and answers on a hotkey",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "check-permissions": "electron . --check-permissions",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --mac"
+  },
+  "devDependencies": {
+    "electron": "44.9.2",
+    "electron-builder": "26.0.12"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "build": {
+    "appId": "com.clueless.app",
+    "productName": "Clueless",
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer.js",
+      "index.html",
+      "settings.html",
+      "settings.js",
+      "settings-preload.js",
+      "!node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../native/build",
+        "to": "native",
+        "filter": ["**/*"]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": ["dmg", "zip"],
+      "hardenedRuntime": true,
+      "entitlements": "entitlements.mac.plist",
+      "entitlementsInherit": "entitlements.mac.plist",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Clueless transcribes your microphone locally so it can answer questions in your meeting.",
+        "NSAudioCaptureUsageDescription": "Clueless records meeting audio locally to transcribe it on this machine.",
+        "LSUIElement": true
+      }
+    }
+  }
+}

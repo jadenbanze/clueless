@@ -1,0 +1,13 @@
+# Runtime dependencies for the Clueless server.
+# Versions pinned to what this build was tested against.
+fastapi==0.111.0
+uvicorn==0.30.6
+chromadb==0.5.15
+python-dotenv==1.0.1
+certifi==2024.12.14
+pydantic==2.9.2
+numpy==1.26.4
+
+# Not required: torch, faster-whisper, sentence-transformers. Transcription runs
+# in the native helper via Apple's on-device Speech framework, and embeddings go
+# to Ollama. Installing them would add several GB for no benefit.
