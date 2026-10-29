@@ -13,6 +13,7 @@ import re
 from dataclasses import dataclass
 
 from . import config, ollama_client
+from .vectorstore import VectorStore
 
 log = logging.getLogger(__name__)
 
@@ -41,41 +42,27 @@ class Chunk:
 
 
 class Store:
-    """Thin wrapper around the two Chroma collections."""
+    """Vector retrieval over the local SQLite store.
+
+    Replaces ChromaDB, which pulled ~360 MB of dependencies (kubernetes, grpc,
+    posthog, onnxruntime) for a narrow feature set we never used. See
+    vectorstore.py.
+    """
 
     def __init__(self) -> None:
-        import chromadb
-        from chromadb.config import Settings
-
         config.CHROMA_DIR.mkdir(parents=True, exist_ok=True)
-        # Telemetry off, deliberately. Chroma defaults to shipping anonymised
-        # usage data to PostHog; this tool's entire premise is that meeting
-        # content stays on the machine, and the retry backoff on a blocked
-        # network also added seconds to every collection call.
-        self._client = chromadb.PersistentClient(
-            path=str(config.CHROMA_DIR),
-            settings=Settings(anonymized_telemetry=False, allow_reset=False),
-        )
+        self._store = VectorStore(config.CHROMA_DIR / "vectors.sqlite3")
 
-    def _collection(self, name: str):
-        return self._client.get_or_create_collection(
-            name=name, metadata={"hnsw:space": "cosine"}
-        )
-
-    def add(self, collection: str, ids: list[str], texts: list[str], metadatas: list[dict]) -> None:
+    def add(self, collection: str, ids: list[str], texts: list[str],
+            metadatas: list[dict]) -> None:
         if not ids:
             return
         vectors = ollama_client.embed(texts)
-        self._collection(collection).upsert(
-            ids=ids, embeddings=vectors, documents=texts, metadatas=metadatas
-        )
+        self._store.add(collection, ids, texts, metadatas, vectors)
         log.info("indexed %d chunks into %s", len(ids), collection)
 
     def count(self, collection: str) -> int:
-        try:
-            return self._collection(collection).count()
-        except Exception:
-            return 0
+        return self._store.count(collection)
 
     def search(
         self, collection: str, query: str, top_k: int | None = None,
@@ -84,35 +71,26 @@ class Store:
         if not query.strip():
             return []
         try:
-            collection_handle = self._collection(collection)
-            size = collection_handle.count()
+            size = self._store.count(collection)
             if size == 0:
                 return []
             # Over-fetch so duplicates and low-value files can be filtered
-            # without starving the result set — but never ask for more than the
-            # collection holds, which makes Chroma emit a warning on every call.
+            # without starving the result set.
             requested = min(over_fetch or (top_k or config.RETRIEVE_TOP_K) * 4, size)
             vector = ollama_client.embed([query])[0]
-            results = collection_handle.query(
-                query_embeddings=[vector],
-                n_results=requested,
-                include=["documents", "metadatas", "distances"],
-            )
+            results = self._store.query(collection, vector, requested)
         except Exception as error:
             log.warning("retrieval from %s failed: %s", collection, error)
             return []
 
         chunks: list[Chunk] = []
-        documents = (results.get("documents") or [[]])[0]
-        metadatas = (results.get("metadatas") or [[]])[0]
-        distances = (results.get("distances") or [[]])[0]
-        for document, metadata, distance in zip(documents, metadatas, distances):
+        for document, metadata, similarity in results:
             metadata = metadata or {}
             path = str(metadata.get("path", "")).lower()
             if any(marker in path for marker in config.CODE_LOW_VALUE_MARKERS):
                 continue
-            # Cosine distance -> similarity, so higher is better.
-            chunks.append(Chunk(text=document, metadata=metadata, score=1.0 - distance))
+            # Already cosine similarity: higher is better.
+            chunks.append(Chunk(text=document, metadata=metadata, score=similarity))
 
         # Keep only the best chunk per file. Several windows of one file crowd
         # out other sources while adding little: they overlap heavily.

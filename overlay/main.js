@@ -95,8 +95,13 @@ function startApiServer() {
     cwd: PROJECT_ROOT,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
-  apiProcess.stdout.on('data', (chunk) => process.stdout.write(`[api] ${chunk}`));
-  apiProcess.stderr.on('data', (chunk) => process.stderr.write(`[api] ${chunk}`));
+  // Mirror API output to a file as well as stdout. A packaged app's stdout goes
+  // nowhere useful, which made a failed server spawn impossible to diagnose.
+  const logPath = path.join(require('os').tmpdir(), 'clueless-api.log');
+  const logStream = require('fs').createWriteStream(logPath, { flags: 'w' });
+  apiProcess.stdout.on('data', (chunk) => { process.stdout.write(`[api] ${chunk}`); logStream.write(chunk); });
+  apiProcess.stderr.on('data', (chunk) => { process.stderr.write(`[api] ${chunk}`); logStream.write(chunk); });
+  console.log(`[api] log: ${logPath}`);
   apiProcess.on('exit', (code) => {
     if (code !== 0 && code !== null) console.error(`[api] exited with code ${code}`);
     apiProcess = null;

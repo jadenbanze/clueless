@@ -1,8 +1,10 @@
 # Runtime dependencies for the Clueless server.
+# chromadb was removed: it pulled ~360 MB of dependencies (kubernetes, grpc,
+# posthog, onnxruntime) for a narrow feature set. Retrieval now uses a local
+# SQLite + numpy store — see server/vectorstore.py.
 # Versions pinned to what this build was tested against.
 fastapi==0.111.0
 uvicorn==0.30.6
-chromadb==0.5.15
 python-dotenv==1.0.1
 certifi==2024.12.14
 pydantic==2.9.2
