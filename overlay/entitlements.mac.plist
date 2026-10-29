@@ -6,6 +6,11 @@
          cannot capture audio or spawn the native helpers. -->
     <key>com.apple.security.device.audio-input</key>
     <true/>
+    <!-- V8 must reserve executable memory for its CodeRange. Without allow-jit
+         the packaged app dies at launch with "Failed to reserve virtual memory
+         for CodeRange" — hardened runtime blocks it by default. -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
     <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
     <true/>
     <!-- The helpers are signed with the same identity but spawned as children. -->

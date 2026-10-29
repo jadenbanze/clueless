@@ -3,7 +3,8 @@
   "productName": "Clueless",
   "version": "0.2.0",
   "private": true,
-  "description": "Local-only meeting assistant — transcribes on-device and answers on a hotkey",
+  "author": "Clueless contributors",
+  "description": "Local-only meeting assistant \u2014 transcribes on-device and answers on a hotkey",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -34,13 +35,34 @@
     "extraResources": [
       {
         "from": "../native/build",
-        "to": "native",
-        "filter": ["**/*"]
+        "to": "native/build",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../native/build/python",
+        "to": "native/build/python",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../server",
+        "to": "server",
+        "filter": [
+          "**/*.py",
+          "!**/__pycache__/**",
+          "!**/test_*.py"
+        ]
       }
     ],
     "mac": {
       "category": "public.app-category.productivity",
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "hardenedRuntime": true,
       "entitlements": "entitlements.mac.plist",
       "entitlementsInherit": "entitlements.mac.plist",
@@ -48,7 +70,9 @@
         "NSMicrophoneUsageDescription": "Clueless transcribes your microphone locally so it can answer questions in your meeting.",
         "NSAudioCaptureUsageDescription": "Clueless records meeting audio locally to transcribe it on this machine.",
         "LSUIElement": true
-      }
+      },
+      "icon": "build/Clueless.icns",
+      "identity": "Clueless Dev"
     }
   }
 }

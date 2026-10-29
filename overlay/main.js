@@ -23,7 +23,13 @@ const {
 const { spawn } = require('child_process');
 const path = require('path');
 
-const PROJECT_ROOT = path.join(__dirname, '..');
+// In development __dirname is overlay/, so the project root is one level up.
+// In a packaged build __dirname is inside app.asar, where '..' is meaningless —
+// the helpers and server live in Resources/ instead. Getting this wrong makes
+// the packaged app fail to find either, with no useful error.
+const PROJECT_ROOT = app.isPackaged
+  ? process.resourcesPath
+  : path.join(__dirname, '..');
 const API_BASE = 'http://127.0.0.1:8766';
 const API_WS = 'ws://127.0.0.1:8766/events';
 
@@ -78,7 +84,14 @@ async function ensureMicrophoneAccess() {
 }
 
 function startApiServer() {
-  apiProcess = spawn('python3', ['-m', 'server.api'], {
+  // Prefer the bundled relocatable Python so a packaged build needs nothing
+  // installed. PyInstaller was tried first and abandoned: its bootloader hung
+  // before Python started, and the one-file binary was 363 MB — larger than the
+  // whole app — for the same dependency set this ships directly.
+  const bundled = path.join(PROJECT_ROOT, 'native', 'build', 'python', 'bin', 'python3');
+  const interpreter = require('fs').existsSync(bundled) ? bundled : 'python3';
+
+  apiProcess = spawn(interpreter, ['-m', 'server.api'], {
     cwd: PROJECT_ROOT,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -88,7 +101,7 @@ function startApiServer() {
     if (code !== 0 && code !== null) console.error(`[api] exited with code ${code}`);
     apiProcess = null;
   });
-  console.log('[api] server starting');
+  console.log(`[api] server starting (${interpreter === 'python3' ? 'system python3' : 'bundled python'})`);
 }
 
 function send(channel, payload) {
