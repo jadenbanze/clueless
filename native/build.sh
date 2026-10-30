@@ -71,7 +71,12 @@ PLIST
 # code identity, so TCC pins the audio-capture grant to the binary's CDHash and
 # re-prompts on every source change. A real certificate keeps the designated
 # requirement stable, so permission is granted once. See setup-signing.sh.
-SIGN_IDENTITY="Clueless Dev"
+# Identity precedence:
+#   1. CLUELESS_SIGN_IDENTITY — set by release.sh from .env.signing so the helper
+#      matches the app. Notarization rejects a bundle whose nested binaries are
+#      signed with a different identity.
+#   2. The local self-signed certificate, for development.
+SIGN_IDENTITY="${CLUELESS_SIGN_IDENTITY:-Clueless Dev}"
 if security find-identity -v -p codesigning | grep -q "${SIGN_IDENTITY}"; then
     echo "==> signing with stable identity '${SIGN_IDENTITY}'"
     codesign --force --sign "${SIGN_IDENTITY}" \

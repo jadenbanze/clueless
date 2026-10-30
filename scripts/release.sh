@@ -40,6 +40,16 @@ node -e 'const v=process.versions.node.split(".").map(Number); if (v[0]<22||(v[0
 
 echo "    all checks passed"
 
+# The helper must carry the same identity as the app bundle, or notarization
+# rejects the archive.
+if [ -n "${CSC_NAME:-}" ]; then
+    export CLUELESS_SIGN_IDENTITY="${CSC_NAME}"
+    echo "    helper will be signed as: ${CSC_NAME}"
+else
+    echo "    CSC_NAME not set — helper falls back to the self-signed dev cert,"
+    echo "    which will fail notarization."
+fi
+
 echo "==> building native helpers"
 (cd native && ./build.sh)
 
