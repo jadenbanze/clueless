@@ -23,6 +23,9 @@ command you need.
 | **Python** | 3.11 | 3.11 | Tested on 3.11; 3.12+ untested |
 | **Ollama** | installed | running | Local model server; also used for embeddings |
 
+Retrieval uses a local SQLite + numpy index — no vector database service to
+install or run.
+
 ### Optional
 
 | | Needed for | Notes |
@@ -144,6 +147,12 @@ PROBE [system] peak=0.83
 
 ### First run
 
+A fresh install has an **empty context index** — `/health` will report
+`jira_chunks: 0`. That is expected: indexing needs your credentials and is a
+deliberate step, not something that happens at install time. Until you index,
+the assistant still works; it just answers from the transcript and screen alone.
+
+
 Open **Settings…** from the menu bar. Leave developer mode off for general use,
 or turn it on and fill in your Jira site, project key, Confluence spaces and
 GitHub repos. Settings save to `.cache/settings.json`; credentials stay in `.env`.
@@ -156,6 +165,20 @@ python3 -c "from server import indexers; print(indexers.build_all())"
 
 Unconfigured sources are skipped cleanly — the app still runs as a general
 assistant.
+
+### Install location matters
+
+Install to **`/Applications`**, not to a folder under `~/Desktop`, `~/Documents`
+or `~/Downloads`.
+
+macOS protects those folders, so an app launched from one triggers a prompt:
+
+> "Clueless" would like to access files in your Desktop folder.
+
+Until that prompt is answered the app sits blocked before it starts its server —
+it looks like a hang, with no error. `/Applications` is not protected, so the
+prompt never appears. If you must run it elsewhere, approve the prompt once and
+it will not return.
 
 ## 3. Run
 

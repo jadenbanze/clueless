@@ -68,6 +68,12 @@ cd overlay && npm start
 The overlay is excluded from screen capture, so it does not appear to anyone you
 share your screen with.
 
+## Install
+
+Drag `Clueless.app` to **`/Applications`**. Do not run it from a folder under
+`~/Desktop`, `~/Documents` or `~/Downloads` — macOS protects those and will block
+startup on a folder-access prompt.
+
 ## Configure
 
 Everything is set up from **Settings…** in the menu bar, or in `.env`:
