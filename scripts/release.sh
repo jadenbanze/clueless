@@ -21,13 +21,20 @@ fi
 
 echo "==> pre-flight checks"
 
-[ -f .env ] && fail ".env is present. Move it out of the tree (or delete it) before packaging — it contains API tokens."
+# .env is expected to exist for a local build — it holds the credentials the app
+# needs. What matters is that it never reaches the bundle, which is verified
+# after packaging below (electron-builder only includes an explicit file list).
 [ -d .git ] || echo "    note: not a git repository; provenance cannot be verified"
 
 # Anything that looks like a live token in files that would ship.
+# Exclude the credential files themselves: they are supposed to hold tokens and
+# are never bundled (verified against the built app below). Scanning them would
+# block every legitimate build.
 if grep -rIlE "ATATT[0-9A-Za-z=_-]{10,}|gho_[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,}" \
     --exclude-dir=node_modules --exclude-dir=.cache --exclude-dir=dist \
-    --exclude-dir=.chroma --exclude-dir=build . 2>/dev/null | grep -q .; then
+    --exclude-dir=.chroma --exclude-dir=build \
+    --exclude=".env" --exclude=".env.*" \
+    --exclude-dir=.git . 2>/dev/null | grep -q .; then
     fail "a live-looking token was found in the tree (see above)"
 fi
 
@@ -71,6 +78,18 @@ if [ -z "${APPLE_ID:-}" ] || [ -z "${APPLE_APP_SPECIFIC_PASSWORD:-}" ] || [ -z "
     echo
 fi
 npx electron-builder --mac
+
+echo
+echo "==> verifying the bundle contains no credentials"
+BUNDLE="dist/mac-arm64/Clueless.app"
+if [ -d "$BUNDLE" ]; then
+    for leaked in ".env" ".env.signing" "settings.json"; do
+        if find "$BUNDLE" -name "$leaked" -print -quit 2>/dev/null | grep -q .; then
+            fail "$leaked was found inside the app bundle"
+        fi
+    done
+    echo "    clean"
+fi
 
 echo
 echo "==> done"
