@@ -43,8 +43,10 @@ echo "    all checks passed"
 # The helper must carry the same identity as the app bundle, or notarization
 # rejects the archive.
 if [ -n "${CSC_NAME:-}" ]; then
-    export CLUELESS_SIGN_IDENTITY="${CSC_NAME}"
-    echo "    helper will be signed as: ${CSC_NAME}"
+    # CSC_NAME is the bare name electron-builder expects; codesign needs the
+    # full identity string.
+    export CLUELESS_SIGN_IDENTITY="Developer ID Application: ${CSC_NAME}"
+    echo "    helper will be signed as: ${CLUELESS_SIGN_IDENTITY}"
 else
     echo "    CSC_NAME not set — helper falls back to the self-signed dev cert,"
     echo "    which will fail notarization."
