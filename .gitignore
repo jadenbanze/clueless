@@ -2,6 +2,8 @@
 # Never commit. .env.example documents the expected keys.
 .env
 .env.*
+# Signing/notarization credentials — build-time only, never committed
+.env.signing
 !.env.example
 
 # ── Local state and generated data ──────────────────────────────────────────

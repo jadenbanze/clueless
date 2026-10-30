@@ -12,6 +12,13 @@ ROOT="$(pwd)"
 
 fail() { echo "release blocked: $*" >&2; exit 1; }
 
+# Build credentials live in .env.signing, never in .env: that file is the app's
+# runtime environment and these values should not be visible to the running app.
+if [ -f .env.signing ]; then
+    echo "==> loading signing credentials"
+    set -a; . ./.env.signing; set +a
+fi
+
 echo "==> pre-flight checks"
 
 [ -f .env ] && fail ".env is present. Move it out of the tree (or delete it) before packaging — it contains API tokens."
@@ -43,6 +50,13 @@ echo "==> packaging"
 cd overlay
 if ! npx --no-install electron-builder --version >/dev/null 2>&1; then
     fail "electron-builder is not installed — run: cd overlay && npm install"
+fi
+if [ -z "${APPLE_ID:-}" ] || [ -z "${APPLE_APP_SPECIFIC_PASSWORD:-}" ] || [ -z "${APPLE_TEAM_ID:-}" ]; then
+    echo
+    echo "    NOTE: notarization credentials are incomplete (.env.signing)."
+    echo "    The app will be signed but NOT notarized, so Gatekeeper will warn"
+    echo "    on other Macs. See .env.signing.example."
+    echo
 fi
 npx electron-builder --mac
 

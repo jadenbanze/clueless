@@ -72,7 +72,7 @@
         "LSUIElement": true
       },
       "icon": "build/Clueless.icns",
-      "identity": "Clueless Dev"
+      "notarize": true
     }
   }
 }
