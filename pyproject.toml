@@ -22,6 +22,22 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "server/test_*.py" = ["S", "B"]
 
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["server"]
+omit = ["server/test_*.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+# The offline suites cover about a quarter of server/ today. The floor fails
+# the build if a change drops that, and should be raised as more code is tested.
+fail_under = 20
+
 [tool.bandit]
 exclude_dirs = ["native/build", "overlay/node_modules", ".venv"]
 # Same rationale as the ruff ignores above. B301/B506/B602/B307 (pickle,
