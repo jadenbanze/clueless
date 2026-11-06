@@ -86,12 +86,13 @@ jobs:
       - name: Build bundled Python
         run: native/build-python.sh
 
-      - name: Third-party notices and license check
-        run: scripts/third_party_notices.sh
-
       - name: Install overlay dependencies
         working-directory: overlay
         run: npm ci
+
+      # After npm ci: the notices read Electron and the npm tree from node_modules.
+      - name: Third-party notices and license check
+        run: scripts/third_party_notices.sh
 
       - name: Package (signed)
         if: env.HAS_CERT == 'true'

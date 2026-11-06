@@ -69,9 +69,6 @@ jobs:
       - name: Build bundled Python
         run: native/build-python.sh
 
-      - name: License check
-        run: scripts/third_party_notices.sh --check
-
       # The tests that need no audio and no model, run on the interpreter that
       # ships. -B keeps bytecode out of it.
       - name: Python tests
@@ -88,3 +85,8 @@ jobs:
         run: |
           npm ci
           npm test
+
+      # Runs after npm ci: it reads Electron's and the npm tree's licenses from
+      # overlay/node_modules.
+      - name: License check
+        run: scripts/third_party_notices.sh --check
