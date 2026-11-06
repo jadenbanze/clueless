@@ -17,6 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import config, providers
 from .providers import http as provider_http
+from .providers import ollama as ollama_provider
 from .providers.base import ProviderError
 
 failures: list[str] = []
@@ -87,6 +88,11 @@ def scenario(candidates, *, foundation: bool, provider: str = "auto", live_model
 def main() -> int:
     saved = (list(providers.AUTO_CANDIDATES), config.LLM_PROVIDER, config.LIVE_MODEL, config.LLM_BASE_URL,
              providers._foundation._available)
+    # The "largest model that fits in half of RAM" expectations below were written
+    # for a 36 GB Mac. Pin RAM so the result does not depend on the machine running
+    # the tests (CI runners have far less memory).
+    saved_ram = ollama_provider._total_ram_bytes
+    ollama_provider._total_ram_bytes = lambda: 36 * 1024**3
     ollama, ollama_url = fake_server("ollama", [
         ("llama3.2:latest", 2_000_000_000), ("llama3.1:8b", 4_900_000_000), ("nomic-embed-text:latest", 270_000_000)])
     small_ollama, small_url = fake_server("ollama", [
@@ -162,6 +168,7 @@ def main() -> int:
         providers.AUTO_CANDIDATES[:] = saved[0]
         config.LLM_PROVIDER, config.LIVE_MODEL, config.LLM_BASE_URL = saved[1], saved[2], saved[3]
         providers._foundation._available = saved[4]
+        ollama_provider._total_ram_bytes = saved_ram
 
     print(f"\n{'PASS' if not failures else f'FAIL ({len(failures)})'}")
     return 1 if failures else 0
