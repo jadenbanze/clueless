@@ -44,14 +44,18 @@ To use the denylist, put one term per line in an untracked `.denylist` file at
 the repository root. It is gitignored, because publishing the list would
 publish the names it protects.
 
-Tests that need no audio and no model run in CI on every pull request:
+Tests that need no audio and no model run in CI on every pull request.
+pytest collects them and enforces a coverage floor; each suite also still runs
+on its own:
 
 ```bash
-python3 -m server.test_security      # API auth, origin and host checks
-python3 -m server.test_phi           # identifier redaction, positive and negative cases
-python3 -m server.test_profiles      # persona guarantees
-python3 -m server.test_providers     # fallback ladder against fake local servers
-python3 -m server.test_corrections   # vocabulary corrections
+pip install -r requirements.txt -r requirements-dev.txt
+python3 -m pytest                  # coverage floor included
+python3 -m server.test_security    # API auth, origin and host checks
+python3 -m server.test_phi         # identifier redaction, positive and negative cases
+python3 -m server.test_profiles    # persona guarantees
+python3 -m server.test_providers   # fallback ladder against fake local servers
+python3 -m server.test_corrections # vocabulary corrections
 python3 -m server.test_textclean
 cd overlay && npm test && npm run lint
 ```
@@ -71,6 +75,12 @@ caught. Examples inside the prompt get copied into answers verbatim by small
 models, so describe the rule instead of giving a sample answer.
 
 ## Pull requests
+
+`main` does not accept a direct push. Open a pull request. CI has to pass
+before it can merge, and [PR Agent](https://github.com/The-PR-Agent/pr-agent)
+reviews the diff. That review is sent to the model provider configured for the
+repository, so a pull request must not contain a transcript, a token, or the
+contents of `.env`.
 
 - Keep each PR to one change, with a test where the behaviour can be tested.
 - Use [Conventional Commits](https://www.conventionalcommits.org/) for PR titles,

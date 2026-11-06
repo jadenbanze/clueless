@@ -1,0 +1,4 @@
+# Test tools. Not installed into the app bundle and not hashed: these never
+# ship, and they are not imported by the server.
+pytest==8.3.5
+pytest-cov==6.0.0

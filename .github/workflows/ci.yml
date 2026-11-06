@@ -44,6 +44,14 @@ jobs:
       - name: pip-audit
         run: pip-audit --strict --require-hashes --disable-pip -r requirements.lock
 
+      # Coverage of the suites that need no audio and no model. The macOS job
+      # runs the same suites again on the interpreter that ships.
+      - name: Python tests and coverage
+        run: |
+          python -m pip install --disable-pip-version-check --require-hashes -r requirements.lock
+          python -m pip install --disable-pip-version-check -r requirements-dev.txt
+          python -m pytest --cov=server --cov-report=term-missing
+
       - name: npm audit
         working-directory: overlay
         run: npm audit --audit-level=high
@@ -85,6 +93,11 @@ jobs:
         run: |
           npm ci
           npm test
+          # preflight.js is what the overlay tests exercise (about 64% of its lines).
+          node --test --experimental-test-coverage \
+            --test-coverage-include=preflight.js \
+            --test-coverage-lines=60 \
+            test/*.test.js
 
       # Runs after npm ci: it reads Electron's and the npm tree's licenses from
       # overlay/node_modules.
