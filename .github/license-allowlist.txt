@@ -1,0 +1,27 @@
+# Licenses allowed in anything that ships inside Clueless.app.
+# scripts/third_party_notices.sh fails the build on any license not listed here,
+# including "unknown", so a new copyleft dependency can't arrive unnoticed.
+#
+# Lines are SPDX identifiers. Lines of the form `package = SPDX` override a
+# package whose metadata doesn't state its license in a machine-readable way;
+# each override needs a comment saying where the license was confirmed.
+
+MIT
+MIT-CMU
+BSD-2-Clause
+BSD-3-Clause
+Apache-2.0
+ISC
+0BSD
+PSF-2.0
+Python-2.0
+Unlicense
+CC0-1.0
+Zlib
+BlueOak-1.0.0
+# File-level copyleft only; unmodified use in a bundle is fine.
+MPL-2.0
+
+# Overrides
+# numpy's metadata is the full license text; it is BSD-3-Clause (LICENSE.txt in the wheel).
+numpy = BSD-3-Clause

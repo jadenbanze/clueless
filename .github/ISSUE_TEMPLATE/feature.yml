@@ -1,0 +1,30 @@
+name: Feature request
+description: Suggest an improvement.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do in a meeting that Clueless makes hard today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+    validations:
+      required: true
+  - type: dropdown
+    id: profile
+    attributes:
+      label: Which profile does this affect?
+      multiple: true
+      options: [Developer, Medical, General, All]
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy
+      options:
+        - label: This works without sending meeting content off the Mac.
+          required: true

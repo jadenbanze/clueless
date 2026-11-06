@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    />
+    <title>Clueless can't run on this Mac</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; padding: 28px 30px 24px; color: var(--fg); height: 100vh;
+        display: flex; flex-direction: column;
+        font: var(--text-md)/1.55 var(--font); background: var(--surface-solid);
+        -webkit-user-select: none;
+      }
+      h1 { font-size: var(--text-xl); margin: 0 0 6px; font-weight: 600; }
+      .sub { color: var(--muted); margin: 0 0 20px; }
+      ul { list-style: none; margin: 0 0 18px; padding: 0; flex: 1; overflow-y: auto; }
+      li {
+        padding: 12px 14px; margin-bottom: 8px; border-radius: 10px;
+        background: var(--surface-raised); border: 1px solid var(--hairline);
+      }
+      li b { display: block; margin-bottom: 2px; }
+      li.blocking b::before { content: "✗ "; color: var(--danger); }
+      li.warning b::before { content: "! "; color: var(--warn); }
+      li span { color: var(--muted); font-size: var(--text-sm); }
+      .actions { display: flex; gap: 10px; justify-content: flex-end; }
+      button {
+        padding: 8px 16px; border-radius: 8px; font: inherit; cursor: pointer;
+        border: 1px solid var(--hairline); background: #24242a; color: var(--fg);
+      }
+      button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+      #copied { color: var(--muted); font-size: var(--text-sm); margin-right: auto; align-self: center; }
+    </style>
+  </head>
+  <body>
+    <h1>Clueless can't run on this Mac</h1>
+    <p class="sub">Everything Clueless does happens on-device, which needs a recent Mac.</p>
+    <ul id="items"></ul>
+    <div class="actions">
+      <span id="copied"></span>
+      <button id="copy">Copy report</button>
+      <button class="primary" id="quit">Quit</button>
+    </div>
+    <script src="requirements.js"></script>
+  </body>
+</html>

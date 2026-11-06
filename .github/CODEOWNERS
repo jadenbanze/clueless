@@ -1,0 +1,8 @@
+*                         @jadenbanze
+
+# Security boundaries need an owner's review.
+/server/security.py       @jadenbanze
+/server/providers/http.py @jadenbanze
+/server/phi.py            @jadenbanze
+/overlay/*preload.js      @jadenbanze
+/.github/workflows/       @jadenbanze

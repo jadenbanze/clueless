@@ -1,0 +1,142 @@
+{
+  "name": "clueless-overlay",
+  "productName": "Clueless",
+  "version": "0.2.0",
+  "private": true,
+  "author": "Clueless contributors",
+  "description": "Local-only meeting assistant — transcribes on-device and answers on a hotkey",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "start:ls": "../scripts/dev-start.sh",
+    "check-permissions": "electron . --check-permissions",
+    "stop": "../scripts/stop.sh",
+    "pack": "electron-builder --dir",
+    "pack:local": "../scripts/pack-local.sh",
+    "dist": "electron-builder --mac --publish never",
+    "dist:unsigned": "CLUELESS_ADHOC_SIGN=1 CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --publish never",
+    "preflight": "node preflight.js",
+    "test": "node --test test/*.test.js",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "electron": "44.9.2",
+    "electron-builder": "26.18.0",
+    "eslint": "9.39.5",
+    "eslint-plugin-security": "3.0.1",
+    "globals": "15.15.0"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "build": {
+    "appId": "com.clueless.app",
+    "productName": "Clueless",
+    "files": [
+      "*.js",
+      "*.html",
+      "*.css",
+      "!eslint.config.js",
+      "!test/**/*",
+      "!node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../native/build",
+        "to": "native/build",
+        "filter": [
+          "CluelessTap.app/**/*",
+          "ocr",
+          "fmcli"
+        ]
+      },
+      {
+        "from": "../native/build/python",
+        "to": "native/build/python",
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**"
+        ]
+      },
+      {
+        "from": "../server",
+        "to": "server",
+        "filter": [
+          "**/*.py",
+          "!**/__pycache__/**",
+          "!**/test_*.py"
+        ]
+      },
+      {
+        "from": "..",
+        "to": ".",
+        "filter": [
+          "LICENSE",
+          "THIRD_PARTY_NOTICES.txt"
+        ]
+      },
+      {
+        "from": "node_modules/electron/dist",
+        "to": ".",
+        "filter": [
+          "LICENSES.chromium.html"
+        ]
+      }
+    ],
+    "artifactName": "Clueless-${version}-${arch}.${ext}",
+    "afterPack": "build/after-pack.js",
+    "publish": null,
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "minimumSystemVersion": "26.0",
+      "hardenedRuntime": true,
+      "entitlements": "entitlements.mac.plist",
+      "entitlementsInherit": "entitlements.mac.plist",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Clueless transcribes your microphone locally so it can answer questions in your meeting.",
+        "NSAudioCaptureUsageDescription": "Clueless records meeting audio locally to transcribe it on this machine.",
+        "LSUIElement": true
+      },
+      "icon": "build/Clueless.icns",
+      "notarize": false
+    },
+    "dmg": {
+      "title": "Clueless ${version}",
+      "background": "build/dmg-background.png",
+      "icon": "build/Clueless.icns",
+      "iconSize": 96,
+      "window": {
+        "width": 560,
+        "height": 380
+      },
+      "contents": [
+        {
+          "x": 150,
+          "y": 190,
+          "type": "file"
+        },
+        {
+          "x": 410,
+          "y": 190,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    }
+  }
+}

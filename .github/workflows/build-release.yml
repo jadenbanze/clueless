@@ -1,0 +1,166 @@
+name: Build release
+
+# Builds the DMG and zip for a release tag and attaches them, with checksums
+# and an SBOM, to the GitHub Release.
+#
+# Signing is optional. Without the secrets below the app is ad-hoc signed and
+# users open it via System Settings → Privacy & Security → Open Anyway. With
+# them it is Developer ID signed and notarized; no code change is needed:
+#   CSC_LINK          base64 of a Developer ID Application .p12
+#   CSC_KEY_PASSWORD  its export password
+#   APPLE_API_KEY     contents of an App Store Connect API key (.p8)
+#   APPLE_API_KEY_ID  that key's ID
+#   APPLE_API_ISSUER  its issuer ID
+#
+# Needs a macOS 26 runner: the helpers use APIs that exist only in the
+# macOS 26 SDK. If the hosted image is unavailable, point `runs-on` at a
+# self-hosted Apple-silicon runner on macOS 26.
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to build, e.g. v0.2.0
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-26
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ inputs.tag }}
+      HAS_CERT: ${{ secrets.CSC_LINK != '' }}
+      HAS_NOTARY: ${{ secrets.APPLE_API_KEY != '' && secrets.APPLE_API_KEY_ID != '' && secrets.APPLE_API_ISSUER != '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: overlay/package-lock.json
+
+      - name: Check the tag matches the app version
+        run: |
+          version="$(node -p "require('./overlay/package.json').version")"
+          [ "v${version}" = "${TAG}" ] || { echo "tag ${TAG} != overlay/package.json ${version}"; exit 1; }
+
+      - name: Import signing certificate
+        if: env.HAS_CERT == 'true'
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          password="$(openssl rand -hex 24)"
+          echo "$CSC_LINK" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security import "$RUNNER_TEMP/cert.p12" -k "$keychain" -P "$CSC_KEY_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/cert.p12"
+          identity="$(security find-identity -v -p codesigning "$keychain" | sed -n 's/.*"\(Developer ID Application: .*\)"/\1/p' | head -1)"
+          [ -n "$identity" ] || { echo "no Developer ID Application identity in CSC_LINK"; exit 1; }
+          echo "CLUELESS_SIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
+          echo "CSC_NAME=${identity#Developer ID Application: }" >> "$GITHUB_ENV"
+          echo "SIGNING_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
+
+      - name: Build native helpers
+        run: native/build.sh
+
+      - name: Build bundled Python
+        run: native/build-python.sh
+
+      - name: Third-party notices and license check
+        run: scripts/third_party_notices.sh
+
+      - name: Install overlay dependencies
+        working-directory: overlay
+        run: npm ci
+
+      - name: Package (signed)
+        if: env.HAS_CERT == 'true'
+        working-directory: overlay
+        env:
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          notarize=false
+          if [ "$HAS_NOTARY" = "true" ]; then
+            export APPLE_API_KEY="$RUNNER_TEMP/notary.p8"
+            printf '%s' "$APPLE_API_KEY_CONTENT" > "$APPLE_API_KEY"
+            notarize=true
+          fi
+          npx electron-builder --mac --publish never -c.mac.notarize=$notarize
+          rm -f "$RUNNER_TEMP/notary.p8"
+
+      - name: Package (ad-hoc)
+        if: env.HAS_CERT != 'true'
+        working-directory: overlay
+        run: npm run dist:unsigned
+
+      - name: Verify the bundle
+        working-directory: overlay/dist
+        run: |
+          app="mac-arm64/Clueless.app"
+          codesign --verify --deep --strict "$app"
+          for leaked in .env .env.signing settings.json .denylist; do
+            if find "$app" -name "$leaked" -print -quit | grep -q .; then
+              echo "$leaked found inside the app bundle"; exit 1
+            fi
+          done
+          if find "$app" -name __pycache__ -print -quit | grep -q .; then
+            echo "__pycache__ inside the bundle would break its signature seal"; exit 1
+          fi
+          test -f "$app/Contents/Resources/THIRD_PARTY_NOTICES.txt"
+
+      - name: Checksums
+        working-directory: overlay/dist
+        run: shasum -a 256 Clueless-*.dmg Clueless-*.zip | tee SHA256SUMS.txt
+
+      - name: SBOM
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          path: overlay/dist/mac-arm64/Clueless.app
+          format: spdx-json
+          output-file: overlay/dist/Clueless-sbom.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Release notes for unsigned builds
+        if: env.HAS_NOTARY != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          body="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body)"
+          case "$body" in *"Open Anyway"*) exit 0 ;; esac
+          note=$'\n\n### Opening this build\n\nThis build is not notarized. After dragging Clueless to Applications, open it once, choose **Done**, then go to **System Settings → Privacy & Security** and choose **Open Anyway**. Or, after checking `SHA256SUMS.txt`:\n\n```bash\nxattr -dr com.apple.quarantine /Applications/Clueless.app\n```'
+          gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes "${body}${note}"
+
+      - name: Upload to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: overlay/dist
+        run: |
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber \
+            Clueless-*.dmg Clueless-*.zip SHA256SUMS.txt Clueless-sbom.spdx.json
+
+      - name: Remove signing keychain
+        if: always() && env.SIGNING_KEYCHAIN != ''
+        run: security delete-keychain "$SIGNING_KEYCHAIN"

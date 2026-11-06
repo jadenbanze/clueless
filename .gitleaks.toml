@@ -1,0 +1,21 @@
+# Extends gitleaks' default rules with the credentials this project handles.
+title = "clueless"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "atlassian-api-token"
+description = "Atlassian API token"
+regex = '''ATATT[0-9A-Za-z=_\-]{20,}'''
+tags = ["atlassian", "token"]
+
+[[rules]]
+id = "clueless-api-token-file"
+description = "Clueless per-launch API token committed from .cache"
+path = '''(^|/)\.cache/api-token$'''
+tags = ["clueless"]
+
+[allowlist]
+description = "Test fixtures with obviously fake values"
+paths = ['''server/test_security\.py''']

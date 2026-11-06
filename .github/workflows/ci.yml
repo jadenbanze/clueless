@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Lint, secrets and audits
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: overlay/package-lock.json
+
+      - name: Install tools
+        run: |
+          python -m pip install --disable-pip-version-check pre-commit==4.7.0 pip-audit==2.10.1
+          cd overlay && npm ci
+
+      # gitleaks, ruff, bandit, ESLint (security rules), the .env guard and the
+      # denylist hook, exactly as they run locally.
+      - name: pre-commit
+        run: pre-commit run --all-files --show-diff-on-failure
+
+      - name: pip-audit
+        run: pip-audit --strict --require-hashes --disable-pip -r requirements.lock
+
+      - name: npm audit
+        working-directory: overlay
+        run: npm audit --audit-level=high
+
+  macos:
+    name: Build and test (macOS 26)
+    # The helpers use APIs that exist only in the macOS 26 SDK.
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: overlay/package-lock.json
+
+      - name: Build native helpers
+        run: native/build.sh
+
+      - name: Build bundled Python
+        run: native/build-python.sh
+
+      - name: License check
+        run: scripts/third_party_notices.sh --check
+
+      # The tests that need no audio and no model, run on the interpreter that
+      # ships. -B keeps bytecode out of it.
+      - name: Python tests
+        run: |
+          py=native/build/python/bin/python3
+          for test in test_security test_phi test_profiles test_providers test_corrections test_textclean; do
+            echo "::group::$test"
+            "$py" -B -m "server.$test"
+            echo "::endgroup::"
+          done
+
+      - name: Overlay tests
+        working-directory: overlay
+        run: |
+          npm ci
+          npm test

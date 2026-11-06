@@ -1,0 +1,86 @@
+/* Design tokens shared by every Clueless window (overlay, settings,
+   onboarding, requirements). Persona overrides hang off [data-profile] on
+   <html>, set from GET /profile, so a profile can change type size and
+   contrast without any window knowing which profile it is. */
+
+:root {
+  /* Colour */
+  --surface: rgba(20, 20, 24, 0.86);
+  --surface-raised: rgba(44, 44, 50, 0.92);
+  --surface-solid: #1c1c21;
+  --hairline: rgba(255, 255, 255, 0.12);
+  --fg: #ececef;
+  --muted: #8e8e98;
+  --faint: rgba(255, 255, 255, 0.06);
+  --hover: rgba(255, 255, 255, 0.1);
+  --accent: #3b82f6;
+  --accent-hover: #4b8ff7;
+  --live: #34c759;
+  --paused: #ff9f0a;
+  --warn: #ff9f0a;
+  --danger: #ff453a;
+  --ok: #34c759;
+  --me: #7cb0ff;
+  --them: #ffb86a;
+
+  /* Shape */
+  --radius-sm: 7px;
+  --radius: 14px;
+  --radius-lg: 18px;
+  --radius-pill: 999px;
+
+  /* Spacing (4px grid) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Type. --font-scale multiplies reading text only; chrome stays fixed so
+     the overlay's geometry does not change with the profile. */
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-scale: 1;
+  --text-xs: 11.5px;
+  --text-sm: 12.5px;
+  --text-md: 13px;
+  --text-lg: 15px;
+  --text-xl: 20px;
+  --text-2xl: 26px;
+  --text-reading: calc(15px * var(--font-scale));
+  --line-reading: 1.55;
+
+  /* Depth */
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  --blur: blur(30px) saturate(170%);
+
+  /* Motion */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-fast: 0.12s;
+  --dur: 0.18s;
+}
+
+/* Medical: larger reading type, higher contrast, a more opaque surface so
+   text stays legible over any background. */
+[data-profile="medical"] {
+  --font-scale: 1.2;
+  --muted: #c7c7cc;
+  --fg: #ffffff;
+  --surface: rgba(16, 16, 18, 0.95);
+  --hairline: rgba(255, 255, 255, 0.2);
+  --accent: #0a84ff;
+  --line-reading: 1.6;
+}
+
+/* General: unchanged palette; listed so every profile has an explicit hook. */
+[data-profile="general"] {}
+
+/* Developer: denser reading text. */
+[data-profile="developer"] {
+  --font-scale: 0.96;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

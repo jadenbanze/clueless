@@ -1,0 +1,58 @@
+name: Bug report
+description: Something doesn't work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Security problems should be reported privately; see SECURITY.md.
+        **Never paste transcript text, meeting content or credentials here.** Logs don't contain transcripts, but check them before attaching anyway.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: preflight
+    attributes:
+      label: System check
+      description: "Output of `/Applications/Clueless.app/Contents/MacOS/Clueless --preflight-json` (or `cd overlay && npm run preflight -- --json` from source)."
+      render: json
+    validations:
+      required: true
+  - type: dropdown
+    id: profile
+    attributes:
+      label: Profile
+      options: [Developer, Medical, General]
+    validations:
+      required: true
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Model provider
+      options: [Ollama, llama.cpp server, Managed GGUF (llama.cpp), LM Studio, Apple Intelligence, Other OpenAI-compatible]
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Clueless version
+      description: Settings → About, or a commit SHA when running from source.
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Installed from
+      options: [Release DMG, Source]
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines
+      description: "From ~/Library/Application Support/Clueless/logs/ (api.log, mic-helper.log, system-helper.log)."
+      render: text

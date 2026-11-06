@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    />
+    <title>Clueless Settings</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; display: flex; height: 100vh;
+        font: var(--text-md)/1.55 var(--font); color: var(--fg); background: var(--surface-solid);
+      }
+      nav {
+        width: 168px; flex: none; padding: var(--space-6) var(--space-3);
+        border-right: 1px solid var(--hairline); background: #17171b;
+      }
+      nav h1 { font-size: var(--text-lg); margin: 0 var(--space-2) var(--space-4); }
+      nav button {
+        display: block; width: 100%; text-align: left; margin-bottom: 2px;
+        padding: 7px var(--space-2); border-radius: var(--radius-sm); border: 0;
+        background: none; color: var(--muted); font: inherit; cursor: pointer;
+      }
+      nav button:hover { background: var(--faint); color: var(--fg); }
+      nav button.active { background: var(--hover); color: var(--fg); }
+      nav button[hidden] { display: none; }
+      main { flex: 1; overflow-y: auto; padding: var(--space-6) 28px 96px; }
+      .panel { display: none; max-width: 560px; }
+      .panel.active { display: block; }
+      h2 { font-size: var(--text-xl); margin: 0 0 4px; font-weight: 600; }
+      .sub { color: var(--muted); margin: 0 0 var(--space-6); font-size: var(--text-sm); }
+      section {
+        background: var(--surface-raised); border: 1px solid var(--hairline);
+        border-radius: 12px; padding: var(--space-4) 18px; margin-bottom: 14px;
+      }
+      section h3 {
+        font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px;
+        color: var(--muted); margin: 0 0 var(--space-3); font-weight: 600;
+      }
+      label { display: block; margin-bottom: var(--space-3); }
+      label > span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+      input[type="text"], input[type="number"], select {
+        width: 100%; padding: 8px 10px; border-radius: 8px;
+        background: #121215; color: var(--fg); border: 1px solid var(--hairline); font: inherit;
+      }
+      input:focus, select:focus { outline: none; border-color: var(--accent); }
+      .hint { font-size: 11.5px; color: var(--muted); margin: 4px 0 0; }
+      .row { display: flex; gap: var(--space-3); }
+      .row > label { flex: 1; }
+      .toggle { display: flex; align-items: flex-start; gap: 10px; margin-bottom: var(--space-3); }
+      .toggle input { width: 16px; height: 16px; margin-top: 2px; }
+      .toggle b { display: block; font-weight: 500; }
+      .profiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); }
+      .profile-card {
+        border: 1px solid var(--hairline); border-radius: 10px; padding: var(--space-3);
+        background: #121215; cursor: pointer; text-align: left; color: var(--fg); font: inherit;
+      }
+      .profile-card:hover { border-color: var(--muted); }
+      .profile-card.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+      .profile-card b { display: block; margin-bottom: 4px; }
+      .profile-card small { color: var(--muted); font-size: 11.5px; line-height: 1.4; display: block; }
+      .provider { display: flex; align-items: center; gap: var(--space-2); padding: 6px 0; }
+      .provider .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+      .provider .dot.up { background: var(--ok); }
+      .provider small { color: var(--muted); margin-left: auto; }
+      pre {
+        background: #0e0e11; border: 1px solid var(--hairline); border-radius: 8px;
+        padding: var(--space-3); height: 360px; overflow: auto; margin: 0;
+        font: 11.5px/1.45 var(--font-mono); color: #cfcfd6; white-space: pre-wrap; word-break: break-all;
+      }
+      code { font-family: var(--font-mono); font-size: 12px; }
+      button {
+        padding: 8px 16px; border-radius: 8px; font: inherit;
+        border: 1px solid var(--hairline); background: #24242a; color: var(--fg); cursor: pointer;
+      }
+      button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+      button.small { padding: 4px 10px; font-size: 12px; }
+      button:disabled { opacity: 0.5; cursor: default; }
+      footer {
+        position: fixed; left: 168px; right: 0; bottom: 0;
+        display: flex; align-items: center; gap: var(--space-3);
+        padding: 14px 28px; background: #121215; border-top: 1px solid var(--hairline);
+      }
+      #status { color: var(--muted); font-size: 12px; margin-left: auto; }
+      #status.error { color: var(--danger); }
+      [data-dev-only][hidden] { display: none; }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <h1>Settings</h1>
+      <button data-tab="general" class="active">General</button>
+      <button data-tab="model">Model</button>
+      <button data-tab="sources" data-dev-only>Work sources</button>
+      <button data-tab="advanced" data-dev-only>Advanced</button>
+      <button data-tab="logs" data-dev-only>Logs</button>
+      <button data-tab="about">About</button>
+    </nav>
+
+    <main>
+      <div class="panel active" id="panel-general">
+        <h2>General</h2>
+        <p class="sub">Everything runs on this Mac. Credentials live in <code>.env</code> and are never edited here.</p>
+
+        <section>
+          <h3>Profile</h3>
+          <div class="profiles" id="profiles"></div>
+          <p class="hint">Sets sensible defaults for prompts, sources, privacy and layout. Restart to apply.</p>
+        </section>
+
+        <section>
+          <h3>Privacy</h3>
+          <div class="toggle">
+            <input type="checkbox" id="REDACT_PHI" />
+            <label for="REDACT_PHI" style="margin: 0">
+              <b>Redact identifiers on screen</b>
+              <span class="hint" style="margin: 0">Names after titles, dates, record numbers, phone numbers and emails are replaced in everything shown, copied or exported. On by default for the Medical profile.</span>
+            </label>
+          </div>
+          <div class="toggle">
+            <input type="checkbox" id="AUTO_DETECT_CALLS" />
+            <label for="AUTO_DETECT_CALLS" style="margin: 0">
+              <b>Listen only during calls</b>
+              <span class="hint" style="margin: 0">Capture starts when Teams, Zoom, Webex or FaceTime is playing call audio, and stops after the call.</span>
+            </label>
+          </div>
+        </section>
+
+        <section>
+          <h3>Speech</h3>
+          <label>
+            <span>Recognition locale</span>
+            <select id="SPEECH_LOCALE">
+              <option value="en-US">English (US)</option>
+              <option value="en-GB">English (UK)</option>
+              <option value="en-IN">English (India)</option>
+              <option value="en-AU">English (Australia)</option>
+              <option value="en-CA">English (Canada)</option>
+              <option value="en-IE">English (Ireland)</option>
+              <option value="en-NZ">English (New Zealand)</option>
+              <option value="en-SG">English (Singapore)</option>
+            </select>
+          </label>
+          <label>
+            <span>Custom vocabulary corrections</span>
+            <input type="text" id="CLUELESS_CORRECTIONS" placeholder="preeya=Priya, terra form=Terraform, met forming=metformin" />
+          </label>
+          <p class="hint">
+            <code>heard=correct</code> pairs, comma-separated. Teach it names and terms it keeps
+            mishearing. For accents, try a closer locale above.
+          </p>
+        </section>
+      </div>
+
+      <div class="panel" id="panel-model">
+        <h2>Model</h2>
+        <p class="sub">Clueless uses a model running on this Mac. Nothing is sent to a cloud service.</p>
+
+        <section>
+          <h3>Detected providers</h3>
+          <div id="providers"><p class="hint">Checking…</p></div>
+          <p class="hint"><button class="small" id="recheck">Check again</button></p>
+        </section>
+
+        <section>
+          <h3>Provider</h3>
+          <div class="row">
+            <label>
+              <span>Provider</span>
+              <select id="LLM_PROVIDER">
+                <option value="auto">Automatic</option>
+                <option value="ollama">Ollama</option>
+                <option value="openai_compat">llama.cpp / LM Studio (OpenAI-compatible)</option>
+                <option value="llamacpp">Run a GGUF file with llama.cpp</option>
+                <option value="foundation">Apple Intelligence (on-device)</option>
+              </select>
+            </label>
+            <label>
+              <span>Server URL (blank for default)</span>
+              <input type="text" id="LLM_BASE_URL" placeholder="http://127.0.0.1:11434" />
+            </label>
+          </div>
+          <div class="row">
+            <label>
+              <span>Answer model</span>
+              <input type="text" id="LIVE_MODEL" list="model-list" placeholder="llama3.1:8b" />
+            </label>
+            <label>
+              <span>Embedding model</span>
+              <input type="text" id="EMBED_MODEL" list="model-list" placeholder="nomic-embed-text" />
+            </label>
+          </div>
+          <datalist id="model-list"></datalist>
+          <div id="gguf-fields">
+            <label>
+              <span>GGUF model file</span>
+              <input type="text" id="GGUF_PATH" placeholder="/Users/you/models/Llama-3.1-8B-Instruct-Q4_K_M.gguf" />
+            </label>
+            <label>
+              <span>llama-server binary</span>
+              <input type="text" id="LLAMACPP_SERVER" placeholder="/opt/homebrew/bin/llama-server" />
+            </label>
+          </div>
+          <p class="hint">Server URLs must be on this machine (127.0.0.1 or localhost).</p>
+        </section>
+      </div>
+
+      <div class="panel" id="panel-sources">
+        <h2>Work sources</h2>
+        <p class="sub">Index Jira, Confluence and code so answers can cite them. Toggle each during a meeting with ⌘⌥1–3.</p>
+        <section>
+          <h3>Jira &amp; Confluence</h3>
+          <div class="row">
+            <label><span>Jira site</span><input type="text" id="JIRA_SITE" placeholder="yourcompany.atlassian.net" /></label>
+            <label><span>Project key</span><input type="text" id="JIRA_PROJECT_KEY" placeholder="PROJ" /></label>
+          </div>
+          <div class="row">
+            <label><span>Board ID (optional)</span><input type="text" id="JIRA_BOARD_ID" placeholder="1234" /></label>
+            <label><span>Confluence spaces</span><input type="text" id="CONFLUENCE_SPACES" placeholder="ENG, DOCS" /></label>
+          </div>
+          <p class="hint">Credentials go in <code>.env</code> (ATLASSIAN_EMAIL, ATLASSIAN_API_TOKEN).</p>
+        </section>
+        <section>
+          <h3>Code</h3>
+          <div class="row">
+            <label><span>GitHub org</span><input type="text" id="GITHUB_ORG" placeholder="your-org" /></label>
+            <label><span>GitHub account</span><input type="text" id="GITHUB_ACCOUNT" placeholder="(uses gh auth if blank)" /></label>
+          </div>
+          <label><span>Repositories</span><input type="text" id="GITHUB_REPOS" placeholder="repo-a, repo-b" /></label>
+        </section>
+      </div>
+
+      <div class="panel" id="panel-advanced">
+        <h2>Advanced</h2>
+        <p class="sub">Generation parameters for live answers. Defaults were measured; change one at a time.</p>
+        <section>
+          <div class="row">
+            <label><span>Context size (tokens)</span><input type="number" id="LIVE_NUM_CTX" min="1024" max="32768" step="512" placeholder="4096" /></label>
+            <label><span>Max answer tokens</span><input type="number" id="LIVE_NUM_PREDICT" min="16" max="1024" placeholder="90" /></label>
+            <label><span>Temperature</span><input type="number" id="LIVE_TEMPERATURE" min="0" max="1.5" step="0.05" placeholder="0.1" /></label>
+          </div>
+          <label><span>Summary model</span><input type="text" id="SUMMARY_MODEL" list="model-list" placeholder="llama3.1:8b" /></label>
+          <div class="toggle">
+            <input type="checkbox" id="DEVELOPER_MODE" />
+            <label for="DEVELOPER_MODE" style="margin: 0"><b>Developer mode outside the Developer profile</b></label>
+          </div>
+        </section>
+      </div>
+
+      <div class="panel" id="panel-logs">
+        <h2>Logs</h2>
+        <p class="sub">Local only. Logs record lengths and timings, never transcript text.</p>
+        <div class="row" style="margin-bottom: 10px">
+          <select id="log-name" style="max-width: 220px">
+            <option value="api">API server</option>
+            <option value="mic">Microphone helper</option>
+            <option value="system">System audio helper</option>
+          </select>
+          <button class="small" id="log-refresh">Refresh</button>
+        </div>
+        <pre id="log-text"></pre>
+      </div>
+
+      <div class="panel" id="panel-about">
+        <h2>About</h2>
+        <p class="sub" id="version"></p>
+        <section>
+          <h3>Data</h3>
+          <p class="hint" style="margin: 0">Settings, logs and the search index are stored in <code id="data-dir"></code>. Transcripts are kept in memory only.</p>
+        </section>
+        <section>
+          <h3>Walkthrough</h3>
+          <p class="hint" style="margin: 0 0 10px">Run the first-time setup again: profile, permissions, model and a test session.</p>
+          <button id="walkthrough">Run walkthrough</button>
+        </section>
+      </div>
+    </main>
+
+    <footer>
+      <button class="primary" id="save">Save</button>
+      <button id="restart">Save &amp; restart</button>
+      <button id="cancel">Close</button>
+      <span id="status"></span>
+    </footer>
+    <script src="settings.js"></script>
+  </body>
+</html>

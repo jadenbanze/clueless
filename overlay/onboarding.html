@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    />
+    <title>Welcome to Clueless</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; height: 100vh; display: flex; flex-direction: column;
+        font: var(--text-md)/1.55 var(--font); color: var(--fg); background: var(--surface-solid);
+        -webkit-user-select: none;
+      }
+      header { display: flex; justify-content: center; gap: 7px; padding: 22px 0 0; }
+      .pip { width: 7px; height: 7px; border-radius: 50%; background: var(--hairline); transition: background var(--dur) var(--ease), width var(--dur) var(--ease); }
+      .pip.done { background: var(--muted); }
+      .pip.current { background: var(--accent); width: 20px; border-radius: 4px; }
+      main { flex: 1; overflow-y: auto; padding: 26px 56px 8px; }
+      .step { display: none; animation: enter var(--dur) var(--ease); }
+      .step.active { display: block; }
+      @keyframes enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+      h1 { font-size: var(--text-2xl); font-weight: 650; margin: 0 0 6px; letter-spacing: -0.3px; }
+      .lead { color: var(--muted); font-size: var(--text-lg); margin: 0 0 22px; line-height: 1.5; }
+      .card {
+        background: var(--surface-raised); border: 1px solid var(--hairline);
+        border-radius: 12px; padding: 14px 16px; margin-bottom: 10px;
+      }
+      .card b { display: block; margin-bottom: 2px; }
+      .card p { margin: 0; color: var(--muted); font-size: var(--text-sm); }
+      .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+      .choice {
+        text-align: left; font: inherit; color: var(--fg); cursor: pointer;
+        background: var(--surface-raised); border: 1px solid var(--hairline);
+        border-radius: 12px; padding: 16px; min-height: 128px;
+      }
+      .choice:hover { border-color: var(--muted); }
+      .choice.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+      .choice b { display: block; font-size: var(--text-lg); margin-bottom: 6px; }
+      .choice small { color: var(--muted); font-size: var(--text-sm); line-height: 1.45; }
+      .row { display: flex; align-items: center; gap: 12px; }
+      .row .grow { flex: 1; min-width: 0; }
+      .badge { font-size: 11.5px; padding: 2px 8px; border-radius: var(--radius-pill); background: var(--faint); color: var(--muted); white-space: nowrap; }
+      .badge.ok { background: rgba(52, 199, 89, 0.16); color: var(--ok); }
+      .badge.warn { background: rgba(255, 159, 10, 0.16); color: var(--warn); }
+      .badge.bad { background: rgba(255, 69, 58, 0.16); color: var(--danger); }
+      .meter { height: 6px; border-radius: 3px; background: var(--faint); overflow: hidden; margin-top: 8px; }
+      .meter > div { height: 100%; width: 0; background: var(--ok); transition: width 0.4s var(--ease); }
+      .consent { display: flex; gap: 10px; align-items: flex-start; margin-top: 16px; cursor: pointer; }
+      .consent input { width: 16px; height: 16px; margin-top: 3px; }
+      .note { font-size: var(--text-sm); color: var(--muted); margin: 10px 0 0; }
+      .note.warn { color: var(--warn); }
+      code, .cmd { font-family: var(--font-mono); font-size: 12px; }
+      .cmd {
+        display: flex; align-items: center; gap: 8px; margin-top: 8px;
+        background: #0e0e11; border: 1px solid var(--hairline); border-radius: 8px; padding: 7px 10px;
+        -webkit-user-select: text;
+      }
+      .cmd span { flex: 1; }
+      #turns { min-height: 120px; max-height: 210px; overflow-y: auto; }
+      .turn { margin-bottom: 6px; -webkit-user-select: text; }
+      .turn .who { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; margin-right: 6px; }
+      .turn.me .who { color: var(--me); }
+      .turn.them .who { color: var(--them); }
+      .waiting { color: var(--muted); display: flex; align-items: center; gap: 8px; }
+      .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--live); animation: pulse 1.4s infinite; }
+      @keyframes pulse { 50% { opacity: 0.3; } }
+      .keys { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; align-items: center; }
+      kbd {
+        font: 600 12px var(--font); padding: 3px 7px; border-radius: 6px; justify-self: start;
+        background: var(--faint); border: 1px solid var(--hairline);
+      }
+      footer {
+        display: flex; align-items: center; gap: 10px; padding: 14px 56px 22px;
+      }
+      button {
+        padding: 8px 18px; border-radius: 8px; font: inherit; cursor: pointer;
+        border: 1px solid var(--hairline); background: #24242a; color: var(--fg);
+      }
+      button:hover:not(:disabled) { background: #2c2c33; }
+      button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+      button.primary:hover:not(:disabled) { background: var(--accent-hover); }
+      button.link { background: none; border: 0; color: var(--muted); padding: 8px 6px; }
+      button.small { padding: 4px 10px; font-size: 12px; }
+      button:disabled { opacity: 0.45; cursor: default; }
+      .spacer { flex: 1; }
+      [hidden] { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <header id="pips"></header>
+    <main>
+      <!-- 1. Welcome and consent -->
+      <section class="step" data-step="welcome">
+        <h1>Welcome to Clueless</h1>
+        <p class="lead">A meeting assistant that runs entirely on this Mac. It listens, transcribes, and answers questions about the conversation on a hotkey.</p>
+        <div class="card"><b>Nothing leaves your Mac</b><p>Transcription, answers and summaries run on-device. Transcripts are kept in memory and never written to disk.</p></div>
+        <div class="card"><b>Invisible to screen share</b><p>The overlay is excluded from screen recording, so others on the call do not see it.</p></div>
+        <div class="card"><b>Recording needs consent</b><p>Laws on recording conversations vary by place, and many require everyone's agreement. Tell the people you meet that you use a transcription assistant, and follow your organisation's policy.</p></div>
+        <label class="consent">
+          <input type="checkbox" id="consent" />
+          <span>I understand, and I will get consent where it is required.</span>
+        </label>
+      </section>
+
+      <!-- 2. Profile -->
+      <section class="step" data-step="profile">
+        <h1>How will you use it?</h1>
+        <p class="lead">This sets sensible defaults. You can change it any time in Settings.</p>
+        <div class="grid3" id="profiles"></div>
+        <p class="note" id="profile-note"></p>
+      </section>
+
+      <!-- 3. System check -->
+      <section class="step" data-step="system">
+        <h1>System check</h1>
+        <p class="lead">Making sure this Mac has what Clueless needs.</p>
+        <div id="checks"></div>
+        <p><button class="small" id="recheck-system">Check again</button></p>
+      </section>
+
+      <!-- 4. Permissions -->
+      <section class="step" data-step="permissions">
+        <h1>Permissions</h1>
+        <p class="lead">macOS asks before any app can hear audio. Clueless needs two kinds.</p>
+        <div class="card">
+          <div class="row">
+            <div class="grow"><b>Microphone</b><p>Your side of the conversation.</p></div>
+            <span class="badge" id="mic-badge">Not checked</span>
+            <button class="small" id="mic-btn">Allow</button>
+          </div>
+          <div class="meter"><div id="mic-meter"></div></div>
+          <p class="note" id="mic-note" hidden></p>
+        </div>
+        <div class="card">
+          <div class="row">
+            <div class="grow"><b>System audio</b><p>Everyone else on the call. A short sound plays while this is checked.</p></div>
+            <span class="badge" id="sys-badge">Not checked</span>
+            <button class="small" id="sys-btn">Allow</button>
+          </div>
+          <div class="meter"><div id="sys-meter"></div></div>
+          <p class="note" id="sys-note" hidden></p>
+        </div>
+        <div class="card">
+          <div class="row">
+            <div class="grow"><b>Screen recording <span class="badge">Optional</span></b><p>Only for "Explain screen" — reads text on your screen when you turn it on.</p></div>
+            <span class="badge" id="screen-badge"></span>
+            <button class="small" id="screen-btn">Open Settings</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. Model -->
+      <section class="step" data-step="model">
+        <h1>Choose a model</h1>
+        <p class="lead">Answers come from a language model running on this Mac.</p>
+        <div id="model-list"></div>
+        <div class="card" id="model-missing" hidden>
+          <b>No local model found</b>
+          <p>Install one of these, then press “Check again”. Transcription still works without a model.</p>
+          <div class="cmd"><span id="cmd-install">brew install ollama &amp;&amp; ollama serve</span><button class="small" data-copy="cmd-install">Copy</button></div>
+          <div class="cmd"><span id="cmd-pull">ollama pull llama3.1:8b</span><button class="small" data-copy="cmd-pull">Copy</button></div>
+          <p class="note">Offline? Point Clueless at a downloaded <code>.gguf</code> file in Settings → Model.</p>
+        </div>
+        <div class="row" style="margin-top: 12px">
+          <button class="small" id="recheck-model">Check again</button>
+          <button class="small" id="test-model">Test an answer</button>
+          <span class="note grow" id="model-result" style="margin: 0"></span>
+        </div>
+      </section>
+
+      <!-- 6. Test session -->
+      <section class="step" data-step="test">
+        <h1>Try it</h1>
+        <p class="lead">Say a sentence out loud. It should appear below within a few seconds.</p>
+        <div class="card" id="turns">
+          <div class="waiting" id="turns-waiting"><span class="pulse"></span>Listening…</div>
+        </div>
+        <p class="note" id="test-note"></p>
+      </section>
+
+      <!-- 7. Done -->
+      <section class="step" data-step="done">
+        <h1>You're set</h1>
+        <p class="lead">Clueless lives in the menu bar (◉). The overlay appears when a meeting starts.</p>
+        <div class="card keys">
+          <kbd>⌘⇧\</kbd><span>Answer from the last 90 seconds</span>
+          <kbd>⌘⇧A</kbd><span>What should I say?</span>
+          <kbd>⌘⇧E</kbd><span>Explain what was just said</span>
+          <kbd>⌘⇧↩</kbd><span>Type a question</span>
+          <kbd>⌘⇧S</kbd><span>Summarise the meeting</span>
+          <kbd>⌘⇧H</kbd><span>Collapse, hide or show the overlay</span>
+        </div>
+      </section>
+    </main>
+    <footer>
+      <button class="link" id="back">Back</button>
+      <div class="spacer"></div>
+      <button class="link" id="skip">Skip</button>
+      <button class="primary" id="next">Continue</button>
+    </footer>
+    <script src="onboarding.js"></script>
+  </body>
+</html>

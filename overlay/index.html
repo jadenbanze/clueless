@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    />
+    <title>Clueless</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { height: 100%; overflow: hidden; }
+      body {
+        font: 13px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+        color: var(--fg);
+        background: transparent;
+        -webkit-user-select: none;
+        cursor: default;
+        /* Room for the shadow inside the transparent window. */
+        padding: 6px;
+      }
+      button {
+        font: inherit; color: inherit; background: none; border: 0;
+        cursor: pointer; -webkit-app-region: no-drag;
+      }
+      svg { display: block; width: 14px; height: 14px; fill: none;
+            stroke: currentColor; stroke-width: 1.8; stroke-linecap: round;
+            stroke-linejoin: round; }
+
+      /* Liquid-glass approximation, simplified: one surface, one border,
+         one shadow. Dark base so light text stays readable over bright
+         documents and light-themed calls. */
+      #surface {
+        background: var(--surface);
+        border: 1px solid var(--hairline);
+        border-radius: 14px;
+        backdrop-filter: blur(30px) saturate(170%);
+        -webkit-backdrop-filter: blur(30px) saturate(170%);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        overflow: hidden;
+        position: relative;
+      }
+
+      /* ---- Walkthrough coach marks ---- */
+      .tour-target {
+        outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 8px;
+        position: relative; z-index: 21;
+      }
+      #tour {
+        position: absolute; left: 12px; right: 12px; z-index: 22;
+        background: #0f1a2e; border: 1px solid var(--accent); border-radius: 12px;
+        padding: 11px 13px; box-shadow: var(--shadow);
+        animation: tour-in var(--dur) var(--ease);
+      }
+      #tour[hidden] { display: none; }
+      @keyframes tour-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+      #tour b { display: block; font-size: 13px; margin-bottom: 3px; }
+      #tour p { margin: 0 0 9px; font-size: 12.5px; color: #c9d4e8; line-height: 1.45; }
+      #tour .tour-foot { display: flex; align-items: center; gap: 8px; }
+      #tour .tour-count { color: #8ea0c0; font-size: 11.5px; margin-right: auto; }
+      #tour button {
+        font: inherit; font-size: 12px; padding: 4px 11px; border-radius: 7px; cursor: pointer;
+        border: 1px solid var(--hairline); background: transparent; color: var(--fg);
+      }
+      #tour button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+
+      /* ---- Nav (shared by pill and card) ---- */
+      .nav {
+        display: flex; align-items: center; gap: 6px;
+        height: 40px; padding: 0 6px 0 4px;
+        position: relative;
+      }
+      .grip {
+        width: 18px; height: 28px; display: grid; place-items: center;
+        color: var(--muted); cursor: grab; -webkit-app-region: drag;
+      }
+      .grip svg { width: 10px; height: 14px; stroke: none; fill: currentColor; }
+      #dot {
+        width: 8px; height: 8px; border-radius: 50%; flex: none;
+        background: var(--muted);
+      }
+      #dot.live { background: var(--live); }
+      #dot.paused { background: var(--paused); }
+      #dot.speaking { background: var(--accent); animation: pulse 1.1s ease-in-out infinite; }
+      @keyframes pulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.4); opacity: 0.55; }
+      }
+      #status { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums;
+                white-space: nowrap; }
+      .spacer { flex: 1; }
+      .icon-btn {
+        width: 28px; height: 28px; border-radius: 8px;
+        display: grid; place-items: center; color: var(--muted);
+        transition: background 0.12s ease, color 0.12s ease;
+      }
+      .icon-btn:hover { background: var(--hover); color: var(--fg); }
+
+      /* Source toggles: always visible in the card, revealed on hover in the
+         pill so the idle state stays one line of quiet chrome. */
+      .sources { display: flex; gap: 2px; }
+      .src {
+        height: 24px; padding: 0 8px; border-radius: 7px;
+        font-size: 11.5px; color: var(--muted);
+        transition: background 0.12s ease, color 0.12s ease;
+      }
+      .src:hover { background: var(--hover); }
+      .src.on { color: var(--fg); background: var(--faint); }
+      .src.on::before {
+        content: ''; display: inline-block; width: 5px; height: 5px;
+        border-radius: 50%; background: var(--live);
+        margin-right: 5px; vertical-align: 1px;
+      }
+      .src { white-space: nowrap; flex: none; }
+      .src[hidden] { display: none; }
+      /* The card has the shortcuts link in its footer instead. */
+      [data-mode="card"] #help { display: none; }
+      [data-mode="pill"] .sources { display: none; }
+      [data-mode="pill"] .nav:hover .sources { display: flex; }
+      [data-mode="pill"] #collapse { display: none; }
+      [data-mode="card"] #expand { display: none; }
+
+      /* Status and toast share one slot: the toast takes the status text's
+         place instead of floating over it, so the two can never overlap. */
+      .status-slot { position: relative; min-width: 64px; height: 20px;
+                     display: flex; align-items: center; }
+      #status { transition: opacity 0.12s ease; }
+      .status-slot.toasting #status { opacity: 0; }
+      #toast {
+        position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+        font-size: 12px; color: var(--fg); white-space: nowrap;
+        pointer-events: none; opacity: 0; transition: opacity 0.12s ease;
+      }
+      .status-slot.toasting #toast { opacity: 1; }
+      [data-mode="pill"] .nav:hover .status-slot { display: none; }
+
+      /* Shown only when no model provider is reachable. */
+      #health { color: var(--paused); }
+      #health[hidden] { display: none; }
+
+      /* Shortcut cheat-sheet, toggled by the ? button. */
+      #shortcuts { display: none; padding: 10px 16px 4px; font-size: 12px; color: var(--muted); }
+      #shortcuts.open { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; }
+      #shortcuts kbd { justify-self: start; }
+
+      /* ---- Card ---- */
+      #card { display: none; border-top: 1px solid var(--faint); }
+      [data-mode="card"] #card { display: block; }
+      /* max-height is set by renderer.js from the window's height cap. */
+      #scroll { overflow-y: auto; }
+
+      #empty { padding: 16px 16px 6px; color: var(--muted); font-size: 13px; }
+      #answer { padding: 14px 16px 8px; display: none; }
+      #answer.visible { display: block; }
+      #answer.visible ~ #empty { display: none; }
+      #question {
+        color: var(--muted); font-size: 12px; margin-bottom: 6px;
+        -webkit-user-select: text;
+      }
+      #question:empty { display: none; }
+      #answer-text {
+        font-size: var(--text-reading); line-height: var(--line-reading); -webkit-user-select: text;
+        white-space: pre-wrap; animation: fade-in 0.18s ease-out;
+      }
+      #answer-text.streaming::after {
+        content: ''; display: inline-block; width: 7px; height: 15px;
+        margin-left: 2px; vertical-align: -2px; border-radius: 2px;
+        background: var(--accent); animation: blink 1s steps(2, start) infinite;
+      }
+      @keyframes blink { to { visibility: hidden; } }
+      @keyframes fade-in { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+
+      /* Summary formatting (built from DOM nodes, never innerHTML). */
+      #answer-text.formatted { white-space: normal; font-size: calc(13.5px * var(--font-scale)); }
+      /* Profiles that hide the transcript (medical) drop the toggle entirely. */
+      [data-hide-transcript] #transcript-toggle, [data-hide-transcript] #turns { display: none !important; }
+      [data-hide-transcript] .foot-row { justify-content: flex-end; }
+      #answer-text h3 { font-size: 13px; font-weight: 600; margin: 12px 0 4px; }
+      #answer-text h3:first-child { margin-top: 0; }
+      #answer-text ul { padding-left: 18px; }
+      #answer-text li { margin: 2px 0; }
+      #answer-text p { margin: 0 0 4px; }
+
+      .answer-foot { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+      #citations { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; min-width: 0; }
+      .citation {
+        max-width: 220px; font-size: 11px; color: var(--muted);
+        background: var(--faint); border-radius: 6px; padding: 2px 7px;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .answer-foot .icon-btn { width: 24px; height: 24px; }
+      .answer-foot .icon-btn svg { width: 13px; height: 13px; }
+
+      /* Chips: one row, primary first. Key caps appear on hover only. */
+      .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px 4px; }
+      .chip {
+        height: 28px; padding: 0 11px; border-radius: 14px;
+        font-size: 12.5px; color: var(--fg); background: var(--faint);
+        border: 1px solid var(--faint);
+        display: inline-flex; align-items: center; gap: 6px;
+        transition: background 0.12s ease;
+      }
+      .chip:hover { background: var(--hover); }
+      .chip.primary { background: var(--accent); border-color: transparent; color: #fff; }
+      .chip.primary:hover { background: #4b8ff7; }
+      .chip kbd { display: none; }
+      .chip:hover kbd { display: inline; }
+      kbd {
+        font: 10.5px ui-monospace, SFMono-Regular, Menlo, monospace;
+        padding: 0 4px; border-radius: 4px; color: inherit; opacity: 0.75;
+        background: rgba(255, 255, 255, 0.12);
+      }
+
+      /* Ask bar. */
+      #ask {
+        display: flex; align-items: center; gap: 6px;
+        margin: 6px 12px 10px; padding: 0 4px 0 12px; height: 36px;
+        border-radius: 18px; background: rgba(0, 0, 0, 0.25);
+        border: 1px solid var(--faint);
+        transition: border-color 0.12s ease;
+      }
+      #ask.focused { border-color: rgba(59, 130, 246, 0.6); }
+      #ask input {
+        flex: 1; min-width: 0; background: none; border: 0; outline: none;
+        color: var(--fg); font: 13px -apple-system, BlinkMacSystemFont, sans-serif;
+        -webkit-app-region: no-drag;
+      }
+      #ask input::placeholder { color: var(--muted); }
+      #send {
+        width: 28px; height: 28px; border-radius: 50%;
+        display: grid; place-items: center;
+        background: var(--accent); color: #fff;
+      }
+      #send svg { width: 13px; height: 13px; stroke-width: 2.2; }
+
+      /* Transcript, closed by default. */
+      #transcript { border-top: 1px solid var(--faint); }
+      .foot-row { display: flex; align-items: center; }
+      #shortcuts-toggle { padding: 8px 16px; color: var(--muted); font-size: 12px; flex: none; }
+      #shortcuts-toggle:hover { color: var(--fg); }
+      #transcript-toggle {
+        flex: 1; display: flex; align-items: center; gap: 6px;
+        padding: 8px 16px; color: var(--muted); font-size: 12px; text-align: left;
+      }
+      #transcript-toggle:hover { color: var(--fg); }
+      #transcript-toggle svg { width: 12px; height: 12px; transition: transform 0.15s ease; }
+      #transcript.open #transcript-toggle svg { transform: rotate(90deg); }
+      #turns { display: none; padding: 0 16px 12px; max-height: 180px; overflow-y: auto; }
+      #transcript.open #turns { display: block; }
+      .turn { font-size: calc(12.5px * var(--font-scale)); line-height: 1.5; margin-bottom: 6px; -webkit-user-select: text; }
+      .turn .who { font-weight: 600; color: var(--me); margin-right: 4px; }
+      .turn.them .who { color: var(--them); }
+
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.14); border-radius: 3px; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-mode="pill">
+      <div id="surface">
+        <div class="nav">
+          <div class="grip" title="Drag to move">
+            <svg viewBox="0 0 10 14"><circle cx="2.5" cy="2.5" r="1.3"/><circle cx="7.5" cy="2.5" r="1.3"/><circle cx="2.5" cy="7" r="1.3"/><circle cx="7.5" cy="7" r="1.3"/><circle cx="2.5" cy="11.5" r="1.3"/><circle cx="7.5" cy="11.5" r="1.3"/></svg>
+          </div>
+          <div id="dot"></div>
+          <div class="status-slot" id="status-slot">
+            <div id="status">Starting…</div>
+            <div id="toast" role="status" aria-live="polite"></div>
+          </div>
+          <button class="icon-btn" id="health" hidden title="No model available — open Settings">
+            <svg viewBox="0 0 16 16"><path d="M8 2.5l6 11H2z"/><path d="M8 6.5v3M8 11.5v.01"/></svg>
+          </button>
+          <div class="spacer"></div>
+          <div class="sources" id="sources">
+            <button class="src" data-source="jira" title="Jira (⌘⌥1)">Jira</button>
+            <button class="src" data-source="confluence" title="Wiki (⌘⌥2)">Wiki</button>
+            <button class="src" data-source="code" title="Code (⌘⌥3)">Code</button>
+            <button class="src" data-source="screen" title="Screen (⌘⌥4)">Screen</button>
+          </div>
+          <button class="icon-btn" id="pause" title="Pause listening">
+            <svg viewBox="0 0 16 16" id="pause-icon"><path d="M5.5 3.5v9M10.5 3.5v9"/></svg>
+          </button>
+          <button class="icon-btn" id="expand" title="Open (⌘⇧\)">
+            <svg viewBox="0 0 16 16"><path d="M4 6l4 4 4-4"/></svg>
+          </button>
+          <button class="icon-btn" id="help" title="Shortcuts">
+            <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M6.5 6.5a1.5 1.5 0 1 1 2 1.4c-.4.2-.5.5-.5.9v.4M8 11v.01"/></svg>
+          </button>
+          <button class="icon-btn" id="collapse" title="Collapse">
+            <svg viewBox="0 0 16 16"><path d="M4 10l4-4 4 4"/></svg>
+          </button>
+          <button class="icon-btn" id="hide" title="Hide (⌘⇧H)">
+            <svg viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg>
+          </button>
+        </div>
+
+        <div id="card">
+          <div id="shortcuts">
+            <kbd>⌘⇧\</kbd><span>Answer from the last 90 seconds</span>
+            <kbd>⌘⇧A</kbd><span>What should I say?</span>
+            <kbd>⌘⇧E</kbd><span>Explain what was just said</span>
+            <kbd>⌘⇧S</kbd><span>Recap the meeting</span>
+            <kbd>⌘⇧↩</kbd><span>Type a question</span>
+            <kbd>⌘⇧H</kbd><span>Collapse / hide / show</span>
+            <kbd>⌘⌥1–4</kbd><span>Toggle Jira, Wiki, Code, Screen</span>
+            <kbd>⌘,</kbd><span>Settings (while focused)</span>
+          </div>
+          <div id="scroll">
+            <div id="answer">
+              <div id="question"></div>
+              <div id="answer-text"></div>
+              <div class="answer-foot">
+                <div id="citations"></div>
+                <button class="icon-btn" id="copy" title="Copy answer">
+                  <svg viewBox="0 0 16 16"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 3.5v-.5a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h.5"/></svg>
+                </button>
+                <button class="icon-btn" id="clear" title="Clear">
+                  <svg viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7"/></svg>
+                </button>
+              </div>
+            </div>
+            <div id="empty">Press <kbd>⌘⇧\</kbd> to ask about the last 90 seconds, or type a question below.</div>
+          </div>
+
+          <div class="chips" id="chips">
+            <button class="chip primary" data-intent="answer">Assist <kbd>⌘⇧\</kbd></button>
+            <button class="chip" data-intent="suggest">What should I say? <kbd>⌘⇧A</kbd></button>
+            <button class="chip" data-intent="explain">Explain screen <kbd>⌘⇧E</kbd></button>
+            <button class="chip" data-intent="recap">Recap <kbd>⌘⇧S</kbd></button>
+          </div>
+
+          <form id="ask" autocomplete="off">
+            <input id="ask-input" type="text" placeholder="Ask about this meeting…" spellcheck="false" />
+            <kbd id="ask-key">⌘⇧↩</kbd>
+            <button id="send" type="submit" title="Send">
+              <svg viewBox="0 0 16 16"><path d="M8 12.5v-9M4 7.5l4-4 4 4"/></svg>
+            </button>
+          </form>
+
+          <div id="transcript">
+            <div class="foot-row">
+              <button id="transcript-toggle">
+                <svg viewBox="0 0 16 16"><path d="M6 4l4 4-4 4"/></svg>
+                <span>Transcript</span>
+              </button>
+              <button id="shortcuts-toggle">Shortcuts</button>
+            </div>
+            <div id="turns"></div>
+          </div>
+        </div>
+        <div id="tour" hidden role="dialog" aria-live="polite">
+          <b id="tour-title"></b>
+          <p id="tour-text"></p>
+          <div class="tour-foot">
+            <span class="tour-count" id="tour-count"></span>
+            <button id="tour-skip">Skip tour</button>
+            <button class="primary" id="tour-next">Next</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="renderer.js"></script>
+  </body>
+</html>

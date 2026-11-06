@@ -1,0 +1,23 @@
+# Runtime dependencies for the Clueless server.
+# chromadb was removed: it pulled ~360 MB of dependencies (kubernetes, grpc,
+# posthog, onnxruntime) for a narrow feature set. Retrieval now uses a local
+# SQLite + numpy store — see server/vectorstore.py.
+#
+# Pinned; requirements.lock adds hashes for every transitive dependency and is
+# what the bundled Python installs from (native/build-python.sh). Regenerate it
+# after changing anything here:
+#   pip-compile --generate-hashes --allow-unsafe -o requirements.lock requirements.txt
+# pip-audit runs against this file in CI.
+fastapi==0.162.0
+uvicorn==0.54.0
+# uvicorn treats a WebSocket upgrade as plain HTTP when no WebSocket library is
+# installed, so /events silently never connects. Required, not optional.
+websockets==17.4
+python-dotenv==1.2.4
+certifi==2026.10.23
+pydantic==2.14.3
+numpy==1.26.4
+
+# Not required: torch, faster-whisper, sentence-transformers. Transcription runs
+# in the native helper via Apple's on-device Speech framework, and embeddings go
+# to the local model provider. Installing them would add several GB for no benefit.
