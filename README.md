@@ -1,8 +1,13 @@
 # Clueless
 
+<p align="center">
+  <img src="site/logo.svg" width="80" height="80" alt="Clueless">
+</p>
+
 **A meeting assistant that runs entirely on your Mac.** Clueless listens to your
 calls, transcribes them on-device, and answers questions about the conversation
 on a hotkey. Nothing is uploaded, and the overlay is invisible to screen share.
+The project site is [jadenbanze.github.io/clueless](https://jadenbanze.github.io/clueless/).
 
 <p align="center">
   <img src="docs/images/overlay-card.png" width="472" alt="The Clueless overlay answering a question during a meeting" />
