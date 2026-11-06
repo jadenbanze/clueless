@@ -283,7 +283,10 @@ def test_answer() -> dict:
             resolution.model, "Answer in one short sentence.", "Say that the model is working.",
             num_ctx=2048, num_predict=24, temperature=0.0, timeout=120)
     except ProviderError as error:
-        return {"error": str(error)[:200]}
+        # The message can quote the model server's response, which may include
+        # paths or a traceback. It stays in the log.
+        log.info("provider test failed: %s", error)
+        return {"error": "unavailable"}
     return {"ok": True, "ms": round((time.monotonic() - started) * 1000), "text": text[:200],
             "provider": resolution.provider.label, "model": resolution.model,
-            "status": resolution.status, "message": resolution.message}
+            "status": resolution.status}

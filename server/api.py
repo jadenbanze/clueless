@@ -629,9 +629,18 @@ def get_providers() -> dict:
 @app.post("/providers/test")
 def test_provider() -> dict:
     result = providers.test_answer()
-    if "error" in result:
-        return JSONResponse(status_code=503, content={"error": result["error"]})
-    return result
+    if not result.get("ok"):
+        # Fixed wording: the provider's own message can echo a server traceback.
+        return JSONResponse(
+            status_code=503,
+            content={"error": "The model did not answer. Check that a local model is running."},
+        )
+    return {
+        "ok": True,
+        "ms": result.get("ms"),
+        "provider": result.get("provider"),
+        "model": result.get("model"),
+    }
 
 
 @app.get("/profile")
