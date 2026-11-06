@@ -11,7 +11,7 @@
 - [ ] Title is a Conventional Commit (`feat:`, `fix:`, `docs:` …): it sets the version bump
 - [ ] `pre-commit run --all-files` passes
 - [ ] Offline tests pass (`python -m pytest`, and `npm test` in `overlay/`)
-- [ ] No transcript, token, or `.env` contents in the diff (PR Agent sends the diff to the configured model)
+- [ ] No transcript, token, or `.env` contents in the diff (CodeRabbit receives the diff)
 - [ ] Prompt changes: `test_brain` passes for every profile
 - [ ] No new network destination, and no weaker security boundary (or it's discussed in an issue)
 - [ ] Docs updated if behaviour changed

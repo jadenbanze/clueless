@@ -77,10 +77,9 @@ models, so describe the rule instead of giving a sample answer.
 ## Pull requests
 
 `main` does not accept a direct push. Open a pull request. CI has to pass
-before it can merge, and [PR Agent](https://github.com/The-PR-Agent/pr-agent)
-reviews the diff. That review is sent to the model provider configured for the
-repository, so a pull request must not contain a transcript, a token, or the
-contents of `.env`.
+before it can merge, and [CodeRabbit](https://www.coderabbit.ai) reviews the
+diff. CodeRabbit is a third-party service, so a pull request must not contain a
+transcript, a token, or the contents of `.env`.
 
 - Keep each PR to one change, with a test where the behaviour can be tested.
 - Use [Conventional Commits](https://www.conventionalcommits.org/) for PR titles,
