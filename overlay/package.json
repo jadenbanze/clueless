@@ -27,6 +27,10 @@
     "eslint-plugin-security": "4.2.1",
     "globals": "17.14.0"
   },
+  "overrides": {
+    "minimatch@^9.0.0": "11.0.5",
+    "minimatch@^10.0.0": "11.0.5"
+  },
   "engines": {
     "node": ">=22.12.0"
   },
