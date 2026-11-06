@@ -16,7 +16,7 @@ websockets==17.4
 python-dotenv==1.2.4
 certifi==2026.10.23
 pydantic==2.14.3
-numpy==1.26.4
+numpy==2.5.4
 
 # Not required: torch, faster-whisper, sentence-transformers. Transcription runs
 # in the native helper via Apple's on-device Speech framework, and embeddings go
