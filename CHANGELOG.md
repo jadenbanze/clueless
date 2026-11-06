@@ -4,6 +4,15 @@ All notable changes are recorded here. From the first public release this file
 is maintained by [release-please](https://github.com/googleapis/release-please)
 from Conventional Commit messages; edit entries in the release PR, not here.
 
+## [0.2.1](https://github.com/jadenbanze/clueless/compare/v0.2.0...v0.2.1) (2026-11-06)
+
+
+### Bug Fixes
+
+* **ci:** pin RAM in provider test; skip CodeQL on private repos ([5c1793e](https://github.com/jadenbanze/clueless/commit/5c1793e3853e7f3cba46e61274ac20762b2dd6a5))
+* **ci:** run the license check after npm ci ([2624d20](https://github.com/jadenbanze/clueless/commit/2624d20ea858b0b46add3bad2882f7cd78a9aca3))
+* do not return model-server errors from the provider test ([ce78f11](https://github.com/jadenbanze/clueless/commit/ce78f1124dd9666dedb406a610aa2c7d3ae6a357))
+
 ## 0.2.0 (2026-11-06)
 
 First public release.

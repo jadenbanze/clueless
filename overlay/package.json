@@ -1,7 +1,7 @@
 {
   "name": "clueless-overlay",
   "productName": "Clueless",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "author": "Clueless contributors",
   "description": "Local-only meeting assistant — transcribes on-device and answers on a hotkey",
