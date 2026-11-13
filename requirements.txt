@@ -8,7 +8,7 @@
 # after changing anything here:
 #   pip-compile --generate-hashes --allow-unsafe -o requirements.lock requirements.txt
 # pip-audit runs against this file in CI.
-fastapi==0.162.0
+fastapi==0.162.3
 uvicorn==0.54.0
 # uvicorn treats a WebSocket upgrade as plain HTTP when no WebSocket library is
 # installed, so /events silently never connects. Required, not optional.
