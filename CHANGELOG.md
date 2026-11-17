@@ -4,6 +4,14 @@ All notable changes are recorded here. From the first public release this file
 is maintained by [release-please](https://github.com/googleapis/release-please)
 from Conventional Commit messages; edit entries in the release PR, not here.
 
+## [0.3.0](https://github.com/jadenbanze/clueless/compare/v0.2.1...v0.3.0) (2026-11-17)
+
+
+### Features
+
+* add student/clinical personas, hybrid RAG, context sources, and UX upgrades ([0291fe9](https://github.com/jadenbanze/clueless/commit/0291fe9c5b7b30e775d1829d31745197a10ed939))
+* student/clinical personas, hybrid BM25+vector RAG, neutral context sources, and UX upgrades ([fd96ecc](https://github.com/jadenbanze/clueless/commit/fd96ecc09914163553b24c333b9801e94a963678))
+
 ## [0.2.1](https://github.com/jadenbanze/clueless/compare/v0.2.0...v0.2.1) (2026-11-06)
 
 
