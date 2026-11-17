@@ -1,20 +1,19 @@
 /* Design tokens shared by every Clueless window (overlay, settings,
-   onboarding, requirements). Persona overrides hang off [data-profile] on
-   <html>, set from GET /profile, so a profile can change type size and
-   contrast without any window knowing which profile it is. */
+   onboarding, requirements). Persona overrides hang off [data-profile] and
+   [data-clinical] on <html>, set from GET /profile. */
 
 :root {
   /* Colour */
-  --surface: rgba(20, 20, 24, 0.86);
-  --surface-raised: rgba(44, 44, 50, 0.92);
-  --surface-solid: #1c1c21;
+  --surface: rgba(20, 20, 25, 0.88);
+  --surface-raised: rgba(42, 42, 49, 0.92);
+  --surface-solid: #1b1b20;
   --hairline: rgba(255, 255, 255, 0.12);
-  --fg: #ececef;
-  --muted: #8e8e98;
+  --fg: #ededf0;
+  --muted: #9494a0;
   --faint: rgba(255, 255, 255, 0.06);
-  --hover: rgba(255, 255, 255, 0.1);
+  --hover: rgba(255, 255, 255, 0.11);
   --accent: #3b82f6;
-  --accent-hover: #4b8ff7;
+  --accent-hover: #4f93f8;
   --live: #34c759;
   --paused: #ff9f0a;
   --warn: #ff9f0a;
@@ -37,8 +36,7 @@
   --space-6: 24px;
   --space-8: 32px;
 
-  /* Type. --font-scale multiplies reading text only; chrome stays fixed so
-     the overlay's geometry does not change with the profile. */
+  /* Type */
   --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   --font-scale: 1;
@@ -52,7 +50,7 @@
   --line-reading: 1.55;
 
   /* Depth */
-  --shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.42);
   --blur: blur(30px) saturate(170%);
 
   /* Motion */
@@ -61,9 +59,15 @@
   --dur: 0.18s;
 }
 
-/* Medical: larger reading type, higher contrast, a more opaque surface so
-   text stays legible over any background. */
-[data-profile="medical"] {
+/* Student: slightly warmer reading rhythm for dense lecture/study definitions. */
+[data-profile="student"] {
+  --line-reading: 1.58;
+}
+
+/* Clinical sub-mode (under Student) or legacy Medical profile: larger reading
+   type, higher contrast, and a more opaque surface. */
+[data-profile="medical"],
+[data-clinical="true"] {
   --font-scale: 1.2;
   --muted: #c7c7cc;
   --fg: #ffffff;
@@ -73,10 +77,8 @@
   --line-reading: 1.6;
 }
 
-/* General: unchanged palette; listed so every profile has an explicit hook. */
 [data-profile="general"] {}
 
-/* Developer: denser reading text. */
 [data-profile="developer"] {
   --font-scale: 0.96;
 }

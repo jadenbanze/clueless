@@ -17,6 +17,8 @@ OFFLINE = [
     "server.test_providers",
     "server.test_corrections",
     "server.test_textclean",
+    "server.test_rag",
+    "server.test_context_sources",
 ]
 
 
