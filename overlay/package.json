@@ -29,7 +29,8 @@
   },
   "overrides": {
     "minimatch@^9.0.0": "11.0.5",
-    "minimatch@^10.0.0": "11.0.5"
+    "minimatch@^10.0.0": "11.0.5",
+    "node-gyp": "11.1.0"
   },
   "engines": {
     "node": ">=22.12.0"
