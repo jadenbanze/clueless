@@ -4,20 +4,15 @@ Two tiers, because their requirements differ:
 
   live    - triggered by a hotkey mid-sentence. Must be fast and terse, and is
             allowed to say it does not know.
-  summary - runs once at the end. Given the whole transcript, optimised for
-            completeness rather than latency.
-
-Model choice was measured against the models available during development. In testing llama3.2 and
-llama3.1:8b correctly abstained when context was missing, while qwen2.5
-confabulated a confident false status — disqualifying for a RAG tool that reports
-on real tickets.
+  summary - runs over the full transcript, optimised for completeness.
 """
 
 from __future__ import annotations
 
 import logging
+import re
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable
 
 from . import config, llm, profiles, providers, rag
@@ -33,13 +28,14 @@ only when it directly answers the question.
 
 Rules:
 - 1-3 sentences. Decisive, no preamble, no headings, no bullet lists unless asked.
-- Give the substance, never a restatement of the question. Name the subject
-  (which decision, blocker, person or system) as well as its status.
+- Give the substance, never a restatement of the question. Always state both the
+  subject (which decision, blocker, concept, person or system) AND its current
+  status (e.g. what is blocking, pending or still needs sign-off).
 - Never hedge ("I think", "it seems", "possibly"). State the answer.
 - Never begin with "From the transcript" or quote speaker labels.
-- Never invent ticket IDs, names, dates, URLs or code behaviour.
-- Never guess who is presenting or attending; say "I can't identify participants
-  from audio."
+- Never invent ticket IDs, citations, dosages, names, dates, URLs or behaviour.
+- Never guess who is presenting or attending unless listed in Meeting calendar;
+  otherwise say "I can't identify participants from audio."
 - If neither source answers, reply exactly: "No info in the loaded context."
 - The transcript may contain speech-recognition errors, filler and missing
   punctuation; answer what was meant.
@@ -47,54 +43,53 @@ Rules:
   use it for references like "this" or "that slide"; ignore UI chrome.
 """
 
-# Intent variants. Every mature Cluely-style tool has distinct actions rather
-# than one generic "ask" — the prompt can then be specific, which costs nothing
-# at runtime and improves answers more than any remaining latency work.
-#
-# Each entry is (instructions, question-template). The template receives the
-# transcript's most recent turn where relevant.
 INTENT_MAX_TOKENS = {"answer": 90, "suggest": 100, "explain": 140}
 
 INTENTS = {
     "answer": (LIVE_SYSTEM, None),
     "suggest": (
-        """You are helping one participant decide what to say next in a live meeting.
+        """You are helping one participant decide what to say next in a live meeting or discussion.
 
 Given the recent transcript, draft the reply THEY should give. Write it in the
 first person, as they would say it aloud.
 
 Rules:
 - 1-2 sentences. Natural spoken language, not written prose.
-- Commit to a position. If something is unknown, say what they would need to
-  check rather than inventing it.
-- Never invent names, dates, ticket IDs or commitments.
+- Commit to a position grounded in the transcript or reference material. If
+  something is unknown, say what they would need to check rather than inventing it.
+- Never invent names, dates, ticket IDs, citations or commitments.
 - No preamble, no quotation marks, no "you could say".
 """,
         "Draft my reply to the last thing said.",
     ),
     "explain": (
-        """You explain what the user is currently looking at.
+        """You explain what the user is currently looking at or hearing.
 
-You get OCR of their screen and the recent transcript. Explain the artefact —
-a slide, a ticket, an error, a diagram — in terms of what it means for the
-discussion.
+You get OCR of their screen (when available), the recent transcript, and any
+matching reference notes. Explain the artefact — a slide, concept, formula,
+ticket, error, diagram or case detail — in terms of what it means here.
 
 Rules:
 - 1-3 sentences. Concrete, no preamble.
 - Speak directly about the artefact. Never write "the user", "you are looking
   at", or "the screen shows" — just say what it is and what matters about it.
-- Ground every claim in the screen text or transcript. If the screen text is
-  unclear or empty, say so plainly.
+- Ground every claim in the screen text, transcript or references. If the screen
+  text is unclear or empty, explain the most recent technical concept in the
+  transcript or say plainly what is missing.
 - Ignore OCR artefacts and application chrome.
-- Never invent numbers or names that are not present.
+- Never invent numbers, dosages, citations or names that are not present.
 """,
         "What am I looking at, and why does it matter here?",
     ),
 }
 
-
-# Default (four-section) summary; the active profile may choose another.
 SUMMARY_SYSTEM = profiles.SUMMARY_PROMPTS["standard"]
+
+_DEICTIC_WORDS = {
+    "this", "that", "these", "those", "it", "its", "they", "them", "their",
+    "there", "here", "blocker", "issue", "ticket", "problem", "slide", "error",
+    "concept", "drug", "study", "paper", "trial", "change", "pr",
+}
 
 
 @dataclass
@@ -103,11 +98,13 @@ class Answer:
     citations: list[str]
     model: str
     elapsed_ms: int
+    citation_links: list[dict] = field(default_factory=list)
 
     def as_dict(self) -> dict:
         return {
             "text": self.text,
             "citations": self.citations,
+            "citation_links": self.citation_links,
             "model": self.model,
             "elapsed_ms": self.elapsed_ms,
         }
@@ -115,9 +112,6 @@ class Answer:
 
 ABSTENTION = "No info in the loaded context."
 
-# Openers that weaken an answer. The prompt forbids them, but a small model still
-# produces them, and in a meeting a hedged answer reads as uncertainty the model
-# does not actually have.
 _HEDGE_PREFIXES = (
     "i think ", "i believe ", "it seems ", "it appears ", "possibly ",
     "perhaps ", "maybe ", "it might be ", "it could be ", "in my opinion ",
@@ -125,39 +119,27 @@ _HEDGE_PREFIXES = (
 
 
 def strip_hedging(text: str) -> str:
-    """Removes a leading hedge so the answer starts with its actual content."""
     stripped = text.lstrip()
     lowered = stripped.lower()
     for prefix in _HEDGE_PREFIXES:
         if lowered.startswith(prefix):
             remainder = stripped[len(prefix):]
-            # Only strip when something substantive follows.
             if len(remainder.strip(" .\n")) > 8:
                 return remainder[0].upper() + remainder[1:] if remainder else remainder
     return text
 
 
 def clean_answer(text: str) -> str:
-    """Removes structural artifacts the small model emits.
-
-    llama3.2 tends to append the abstention sentence even when it has already
-    answered — e.g. "We are blocked on Kafka. No info in the loaded context."
-    — and to add "### Answer" headings despite being told not to. Both are
-    formatting faults rather than reasoning faults, so they are corrected here
-    instead of by escalating to a larger, much slower model.
-    """
     text = text.strip()
     if not text:
         return text
 
-    # Drop markdown headings the model adds unprompted.
     lines = [line for line in text.split("\n") if not line.strip().startswith("#")]
     text = "\n".join(lines).strip()
     text = strip_hedging(text)
 
     lowered = text.lower()
     if ABSTENTION.lower() in lowered:
-        # Keep only the parts that are not the abstention sentence.
         pieces = [
             piece.strip()
             for piece in text.replace(ABSTENTION, "\x00").split("\x00")
@@ -165,45 +147,112 @@ def clean_answer(text: str) -> str:
         ]
         substantive = [p for p in pieces if p.strip(" .\n")]
         if substantive:
-            # There is a real answer; the abstention was spurious.
             return " ".join(substantive).strip()
         return ABSTENTION
 
     return text
 
 
+def _user_context_line() -> str:
+    if config.CLINICAL_MODE:
+        return ""
+    parts = [p.strip() for p in (config.USER_NAME, config.USER_ROLE, config.USER_FOCUS) if p and p.strip()]
+    if not parts:
+        return ""
+    return f"Participant profile (for tone/role only, never invent facts): {' · '.join(parts)[:220]}"
+
+
+def _retrieval_query(question: str, transcript_text: str) -> str:
+    """Builds the query string for retrieval, resolving deictic references."""
+    question = question.strip()
+    words = [w.strip(",.?!:;\"'()").lower() for w in question.split() if w.strip(",.?!:;\"'()")]
+    has_deictic = any(w in _DEICTIC_WORDS for w in words)
+    has_specific = bool(re.search(r"\b([A-Z]{2,}[A-Z0-9_-]*|[A-Z][a-z]+[A-Z]\w*)\b", question))
+
+    if len(words) >= 4 and (has_specific or not has_deictic):
+        return question
+
+    # Pull salient terms and identifiers from the last 250 chars of transcript
+    # rather than dumping raw conversational filler that dilutes embeddings.
+    tail = transcript_text[-280:]
+    salient = re.findall(r"\b(?:[A-Z]{2,}[A-Z0-9_-]*|[A-Za-z][A-Za-z0-9_-]{4,})\b", tail)
+    filtered = [
+        tok for tok in salient
+        if tok.lower() not in {"there", "their", "about", "which", "would", "could", "should", "still", "needs"}
+    ]
+    extra = " ".join(dict.fromkeys(filtered[-10:]))
+    return f"{question} {extra}".strip() if extra else f"{question}\n{transcript_text[-200:]}".strip()
+
+
+def _build_prompt(
+    question: str,
+    transcript_text: str,
+    chunks: list[rag.Chunk],
+    *,
+    intent: str,
+    screen_text: str | None = None,
+    calendar_text: str | None = None,
+) -> tuple[str, str, str]:
+    transcript = transcript_text.strip()
+    if len(transcript) > config.TRANSCRIPT_MAX_CHARS:
+        transcript = "…\n" + transcript[-config.TRANSCRIPT_MAX_CHARS:]
+
+    system_prompt, default_question = INTENTS.get(intent, INTENTS["answer"])
+    system_prompt = profiles.apply_addendum(
+        system_prompt, config.PROFILE, clinical=config.CLINICAL_MODE
+    )
+    user_line = _user_context_line()
+    if user_line:
+        system_prompt = f"{system_prompt.rstrip()}\n- {user_line}\n"
+
+    resolved_question = (question or default_question or "").strip()
+
+    sections = [
+        f"### Question\n{resolved_question}",
+        f"### Recent transcript\n{transcript or '(empty)'}",
+    ]
+    if calendar_text and not config.CLINICAL_MODE:
+        sections.append(f"### Meeting calendar\n{calendar_text.strip()[:450]}")
+    if screen_text:
+        sections.append(f"### What is on the user's screen\n{screen_text.strip()[:900]}")
+    sections.append(f"### Reference material\n{rag.format_context(chunks, query=resolved_question)}")
+    sections.append("Answer the question in the required style.")
+    return system_prompt, "\n\n".join(sections), resolved_question
+
+
+def _should_retrieve(intent: str, question: str, transcript_text: str, sources: set[str] | None) -> bool:
+    if sources is not None and not (sources & set(config.SOURCE_COLLECTIONS)):
+        return False
+    # For "What should I say?", skip RAG unless a specific identifier or technical
+    # question appears, saving ~80ms and avoiding irrelevant context injection.
+    if intent == "suggest" and not question:
+        tail = transcript_text[-220:]
+        if "?" not in tail and not rag.extract_identifiers(tail):
+            return False
+    return True
+
+
 def answer_question(
-    question: str, transcript_text: str, store: rag.Store | None = None,
-    sources: set[str] | None = None, screen_text: str | None = None,
+    question: str,
+    transcript_text: str,
+    store: rag.Store | None = None,
+    sources: set[str] | None = None,
+    screen_text: str | None = None,
+    calendar_text: str | None = None,
     intent: str = "answer",
 ) -> Answer:
     started = time.monotonic()
 
     retrieval_started = time.monotonic()
     chunks: list[rag.Chunk] = []
-    if store is not None:
-        chunks = store.search_all(_retrieval_query(question, transcript_text), sources=sources)
+    if store is not None and _should_retrieve(intent, question, transcript_text, sources):
+        seed = question or (INTENTS.get(intent, INTENTS["answer"])[1] or "")
+        chunks = store.search_all(_retrieval_query(seed, transcript_text), sources=sources)
     retrieval_ms = int((time.monotonic() - retrieval_started) * 1000)
 
-    transcript = transcript_text.strip()
-    if len(transcript) > config.TRANSCRIPT_MAX_CHARS:
-        # Keep the tail: the most recent exchange is what is being discussed.
-        transcript = "…\n" + transcript[-config.TRANSCRIPT_MAX_CHARS:]
-
-    # The question comes first, then the transcript. With the question last, the
-    # model latched onto whichever exchange happened to sit nearest the end —
-    # asking "what is blocking the release?" returned the answer to the *final*
-    # utterance about read-only access instead.
-    system_prompt, default_question = INTENTS.get(intent, INTENTS["answer"])
-    system_prompt = profiles.apply_addendum(system_prompt, config.PROFILE)
-    question = question or (default_question or "")
-
-    prompt = (
-        f"### Question\n{question.strip()}\n\n"
-        f"### Recent transcript\n{transcript or '(empty)'}\n\n"
-        + (f"### What is on the user's screen\n{screen_text.strip()[:900]}\n\n" if screen_text else "")
-        + f"### Reference material\n{rag.format_context(chunks, query=question)}\n\n"
-        "Answer the question in the required style."
+    system_prompt, prompt, _resolved_q = _build_prompt(
+        question, transcript_text, chunks,
+        intent=intent, screen_text=screen_text, calendar_text=calendar_text,
     )
 
     generation_started = time.monotonic()
@@ -227,27 +276,10 @@ def answer_question(
     return Answer(
         text=clean_answer(text) or "No answer produced.",
         citations=[chunk.citation() for chunk in chunks],
+        citation_links=[chunk.citation_meta() for chunk in chunks],
         model=config.LIVE_MODEL,
         elapsed_ms=int((time.monotonic() - started) * 1000),
     )
-
-
-def _retrieval_query(question: str, transcript_text: str) -> str:
-    """Builds the text used for retrieval.
-
-    A self-contained question is used on its own. Appending transcript context
-    dilutes it badly: asking "is there a Jira ticket about Kafka authentication?"
-    during a meeting about Snyk scanning retrieved Playwright tickets, because
-    600 characters of unrelated transcript outweighed the three meaningful words
-    in the question.
-
-    Transcript context is only added when the question is too vague to search on
-    its own ("what about that?", "why?").
-    """
-    question = question.strip()
-    if len(question.split()) >= 4:
-        return question
-    return f"{question}\n{transcript_text[-200:]}".strip()
 
 
 def answer_question_streaming(
@@ -257,34 +289,19 @@ def answer_question_streaming(
     on_delta: Callable[[str], None] | None = None,
     sources: set[str] | None = None,
     screen_text: str | None = None,
+    calendar_text: str | None = None,
     intent: str = "answer",
 ) -> Answer:
-    """Same as answer_question, but emits fragments as they are generated.
-
-    Returns the final, cleaned answer. Callers use `on_delta` to paint the
-    overlay while generation is still running; the returned text is authoritative
-    because cleaning can only be applied once the whole answer exists.
-    """
     started = time.monotonic()
 
     chunks: list[rag.Chunk] = []
-    if store is not None:
-        chunks = store.search_all(_retrieval_query(question, transcript_text), sources=sources)
+    if store is not None and _should_retrieve(intent, question, transcript_text, sources):
+        seed = question or (INTENTS.get(intent, INTENTS["answer"])[1] or "")
+        chunks = store.search_all(_retrieval_query(seed, transcript_text), sources=sources)
 
-    transcript = transcript_text.strip()
-    if len(transcript) > config.TRANSCRIPT_MAX_CHARS:
-        transcript = "…\n" + transcript[-config.TRANSCRIPT_MAX_CHARS:]
-
-    system_prompt, default_question = INTENTS.get(intent, INTENTS["answer"])
-    system_prompt = profiles.apply_addendum(system_prompt, config.PROFILE)
-    question = question or (default_question or "")
-
-    prompt = (
-        f"### Question\n{question.strip()}\n\n"
-        f"### Recent transcript\n{transcript or '(empty)'}\n\n"
-        + (f"### What is on the user's screen\n{screen_text.strip()[:900]}\n\n" if screen_text else "")
-        + f"### Reference material\n{rag.format_context(chunks, query=question)}\n\n"
-        "Answer the question in the required style."
+    system_prompt, prompt, _resolved_q = _build_prompt(
+        question, transcript_text, chunks,
+        intent=intent, screen_text=screen_text, calendar_text=calendar_text,
     )
 
     parts: list[str] = []
@@ -301,6 +318,7 @@ def answer_question_streaming(
     return Answer(
         text=clean_answer(raw) or "No answer produced.",
         citations=[chunk.citation() for chunk in chunks],
+        citation_links=[chunk.citation_meta() for chunk in chunks],
         model=config.LIVE_MODEL,
         elapsed_ms=int((time.monotonic() - started) * 1000),
     )
@@ -309,13 +327,36 @@ def answer_question_streaming(
 def summarise(transcript_text: str) -> Answer:
     started = time.monotonic()
     text = llm.complete(
-        profiles.summary_prompt(config.PROFILE),
+        profiles.summary_prompt(config.PROFILE, clinical=config.CLINICAL_MODE),
         f"### Transcript\n{transcript_text.strip() or '(empty)'}",
         max_tokens=config.SUMMARY_NUM_PREDICT,
         temperature=0.1,
     )
     return Answer(
         text=text or "No summary produced.",
+        citations=[],
+        model=config.SUMMARY_MODEL,
+        elapsed_ms=int((time.monotonic() - started) * 1000),
+    )
+
+
+def summarise_streaming(
+    transcript_text: str, on_delta: Callable[[str], None] | None = None
+) -> Answer:
+    started = time.monotonic()
+    parts: list[str] = []
+    for piece in llm.stream(
+        profiles.summary_prompt(config.PROFILE, clinical=config.CLINICAL_MODE),
+        f"### Transcript\n{transcript_text.strip() or '(empty)'}",
+        max_tokens=config.SUMMARY_NUM_PREDICT,
+        temperature=0.1,
+        task="summary",
+    ):
+        parts.append(piece)
+        if on_delta:
+            on_delta(piece)
+    return Answer(
+        text="".join(parts).strip() or "No summary produced.",
         citations=[],
         model=config.SUMMARY_MODEL,
         elapsed_ms=int((time.monotonic() - started) * 1000),
