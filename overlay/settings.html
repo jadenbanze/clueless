@@ -15,20 +15,20 @@
         font: var(--text-md)/1.55 var(--font); color: var(--fg); background: var(--surface-solid);
       }
       nav {
-        width: 168px; flex: none; padding: var(--space-6) var(--space-3);
-        border-right: 1px solid var(--hairline); background: #17171b;
+        width: 184px; flex: none; padding: var(--space-6) var(--space-3);
+        border-right: 1px solid var(--hairline); background: #16161a;
       }
       nav h1 { font-size: var(--text-lg); margin: 0 var(--space-2) var(--space-4); }
       nav button {
-        display: block; width: 100%; text-align: left; margin-bottom: 2px;
-        padding: 7px var(--space-2); border-radius: var(--radius-sm); border: 0;
+        display: block; width: 100%; text-align: left; margin-bottom: 3px;
+        padding: 7px 10px; border-radius: var(--radius-sm); border: 0;
         background: none; color: var(--muted); font: inherit; cursor: pointer;
       }
       nav button:hover { background: var(--faint); color: var(--fg); }
-      nav button.active { background: var(--hover); color: var(--fg); }
+      nav button.active { background: var(--hover); color: var(--fg); font-weight: 500; }
       nav button[hidden] { display: none; }
-      main { flex: 1; overflow-y: auto; padding: var(--space-6) 28px 96px; }
-      .panel { display: none; max-width: 560px; }
+      main { flex: 1; overflow-y: auto; padding: var(--space-6) 28px 98px; }
+      .panel { display: none; max-width: 620px; }
       .panel.active { display: block; }
       h2 { font-size: var(--text-xl); margin: 0 0 4px; font-weight: 600; }
       .sub { color: var(--muted); margin: 0 0 var(--space-6); font-size: var(--text-sm); }
@@ -39,29 +39,52 @@
       section h3 {
         font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px;
         color: var(--muted); margin: 0 0 var(--space-3); font-weight: 600;
+        display: flex; align-items: center; gap: 8px;
       }
       label { display: block; margin-bottom: var(--space-3); }
       label > span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
-      input[type="text"], input[type="number"], select {
+      label > span .badge { float: right; margin-top: -1px; }
+      input[type="text"], input[type="password"], input[type="number"], select {
         width: 100%; padding: 8px 10px; border-radius: 8px;
         background: #121215; color: var(--fg); border: 1px solid var(--hairline); font: inherit;
       }
       input:focus, select:focus { outline: none; border-color: var(--accent); }
-      .hint { font-size: 11.5px; color: var(--muted); margin: 4px 0 0; }
-      .row { display: flex; gap: var(--space-3); }
+      .hint { font-size: 11.5px; color: var(--muted); margin: 4px 0 0; line-height: 1.45; }
+      .row { display: flex; gap: var(--space-3); align-items: flex-end; }
       .row > label { flex: 1; }
+      .input-action { display: flex; gap: 8px; align-items: center; }
+      .input-action input { flex: 1; }
       .toggle { display: flex; align-items: flex-start; gap: 10px; margin-bottom: var(--space-3); }
-      .toggle input { width: 16px; height: 16px; margin-top: 2px; }
+      .toggle input { width: 16px; height: 16px; margin-top: 2px; flex: none; }
       .toggle b { display: block; font-weight: 500; }
-      .profiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); }
+      .clinical-box {
+        margin-top: 12px; padding: 11px 13px; border-radius: 10px;
+        background: rgba(10, 132, 255, 0.09); border: 1px solid rgba(10, 132, 255, 0.35);
+      }
+      .clinical-box[hidden] { display: none; }
+      .profiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); }
       .profile-card {
         border: 1px solid var(--hairline); border-radius: 10px; padding: var(--space-3);
         background: #121215; cursor: pointer; text-align: left; color: var(--fg); font: inherit;
+        white-space: normal;
       }
       .profile-card:hover { border-color: var(--muted); }
       .profile-card.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
       .profile-card b { display: block; margin-bottom: 4px; }
       .profile-card small { color: var(--muted); font-size: 11.5px; line-height: 1.4; display: block; }
+      .badge {
+        font-size: 11px; padding: 2px 7px; border-radius: var(--radius-pill);
+        background: var(--faint); color: var(--muted); font-weight: 500; text-transform: none; letter-spacing: 0;
+      }
+      .badge.ok { background: rgba(52, 199, 89, 0.16); color: var(--ok); }
+      .badge.warn { background: rgba(255, 159, 10, 0.16); color: var(--warn); }
+      .chips-stat { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+      .stat-pill {
+        font-size: 11.5px; padding: 3px 9px; border-radius: 999px;
+        background: #121215; border: 1px solid var(--hairline); color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+      .stat-pill.populated { color: var(--fg); border-color: rgba(52, 199, 89, 0.4); }
       .provider { display: flex; align-items: center; gap: var(--space-2); padding: 6px 0; }
       .provider .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
       .provider .dot.up { background: var(--ok); }
@@ -73,100 +96,275 @@
       }
       code { font-family: var(--font-mono); font-size: 12px; }
       button {
-        padding: 8px 16px; border-radius: 8px; font: inherit;
+        padding: 8px 15px; border-radius: 8px; font: inherit; white-space: nowrap;
         border: 1px solid var(--hairline); background: #24242a; color: var(--fg); cursor: pointer;
       }
+      button:hover:not(:disabled) { background: #2c2c34; }
       button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
-      button.small { padding: 4px 10px; font-size: 12px; }
+      button.primary:hover:not(:disabled) { background: var(--accent-hover); }
+      button.small { padding: 5px 10px; font-size: 12px; }
       button:disabled { opacity: 0.5; cursor: default; }
       footer {
-        position: fixed; left: 168px; right: 0; bottom: 0;
+        position: fixed; left: 184px; right: 0; bottom: 0;
         display: flex; align-items: center; gap: var(--space-3);
-        padding: 14px 28px; background: #121215; border-top: 1px solid var(--hairline);
+        padding: 13px 28px; background: #121215; border-top: 1px solid var(--hairline);
       }
       #status { color: var(--muted); font-size: 12px; margin-left: auto; }
       #status.error { color: var(--danger); }
-      [data-dev-only][hidden] { display: none; }
+      [data-dev-only][hidden], [hidden] { display: none !important; }
     </style>
   </head>
   <body>
     <nav>
       <h1>Settings</h1>
-      <button data-tab="general" class="active">General</button>
-      <button data-tab="model">Model</button>
-      <button data-tab="sources" data-dev-only>Work sources</button>
+      <button data-tab="general" class="active">General &amp; Profile</button>
+      <button data-tab="sources">Context Sources</button>
+      <button data-tab="model">Local Model</button>
       <button data-tab="advanced" data-dev-only>Advanced</button>
       <button data-tab="logs" data-dev-only>Logs</button>
       <button data-tab="about">About</button>
     </nav>
 
     <main>
+      <!-- 1. General & Profile -->
       <div class="panel active" id="panel-general">
-        <h2>General</h2>
-        <p class="sub">Everything runs on this Mac. Credentials live in <code>.env</code> and are never edited here.</p>
+        <h2>General &amp; Profile</h2>
+        <p class="sub">Everything runs locally on this Mac. Changes apply immediately without dropping an active transcript.</p>
 
         <section>
-          <h3>Profile</h3>
+          <h3>Persona Profile</h3>
           <div class="profiles" id="profiles"></div>
-          <p class="hint">Sets sensible defaults for prompts, sources, privacy and layout. Restart to apply.</p>
+          <div class="clinical-box" id="clinical-box" hidden>
+            <div class="toggle" style="margin-bottom: 0">
+              <input type="checkbox" id="CLINICAL_MODE" />
+              <label for="CLINICAL_MODE" style="margin: 0">
+                <b>Clinical / HIPAA-aware rotation mode</b>
+                <span class="hint" style="margin: 0">Redacts patient identifiers on screen, hides the live transcript panel, switches to clinical summaries, and disables all outbound network syncing (local reference PDFs &amp; offline Anki decks stay usable).</span>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <section id="about-you-section">
+          <h3>About You <span class="badge">Personalises answers &amp; STT</span></h3>
+          <div class="row">
+            <label>
+              <span>Your name</span>
+              <input type="text" id="USER_NAME" placeholder="e.g. Alex Rivera" />
+            </label>
+            <label>
+              <span>Role or study track</span>
+              <input type="text" id="USER_ROLE" placeholder="e.g. MS3 medical student, Backend engineer, PM" />
+            </label>
+          </div>
+          <label style="margin-bottom: 0">
+            <span>Current focus (courses, rotation, team or project)</span>
+            <input type="text" id="USER_FOCUS" placeholder="e.g. Cardiology &amp; Pharmacology block, Distributed payments API" />
+          </label>
         </section>
 
         <section>
-          <h3>Privacy</h3>
+          <h3>Privacy &amp; Call Detection</h3>
           <div class="toggle">
             <input type="checkbox" id="REDACT_PHI" />
             <label for="REDACT_PHI" style="margin: 0">
               <b>Redact identifiers on screen</b>
-              <span class="hint" style="margin: 0">Names after titles, dates, record numbers, phone numbers and emails are replaced in everything shown, copied or exported. On by default for the Medical profile.</span>
+              <span class="hint" style="margin: 0">Names after titles, dates, record numbers, phone numbers and emails are redacted in everything shown, copied or exported. Locked on in Clinical mode.</span>
             </label>
           </div>
-          <div class="toggle">
+          <div class="toggle" style="margin-bottom: 0">
             <input type="checkbox" id="AUTO_DETECT_CALLS" />
             <label for="AUTO_DETECT_CALLS" style="margin: 0">
-              <b>Listen only during calls</b>
-              <span class="hint" style="margin: 0">Capture starts when Teams, Zoom, Webex or FaceTime is playing call audio, and stops after the call.</span>
+              <b>Listen only during active calls</b>
+              <span class="hint" style="margin: 0">Capture starts automatically when Teams, Zoom, Webex or FaceTime outputs call audio, and stops shortly after.</span>
             </label>
           </div>
         </section>
 
         <section>
-          <h3>Speech</h3>
-          <label>
-            <span>Recognition locale</span>
-            <select id="SPEECH_LOCALE">
-              <option value="en-US">English (US)</option>
-              <option value="en-GB">English (UK)</option>
-              <option value="en-IN">English (India)</option>
-              <option value="en-AU">English (Australia)</option>
-              <option value="en-CA">English (Canada)</option>
-              <option value="en-IE">English (Ireland)</option>
-              <option value="en-NZ">English (New Zealand)</option>
-              <option value="en-SG">English (Singapore)</option>
-            </select>
-          </label>
+          <h3>Speech Recognition</h3>
+          <div class="row">
+            <label>
+              <span>Recognition locale</span>
+              <select id="SPEECH_LOCALE">
+                <option value="en-US">English (US)</option>
+                <option value="en-GB">English (UK)</option>
+                <option value="en-IN">English (India)</option>
+                <option value="en-AU">English (Australia)</option>
+                <option value="en-CA">English (Canada)</option>
+                <option value="en-IE">English (Ireland)</option>
+                <option value="en-NZ">English (New Zealand)</option>
+                <option value="en-SG">English (Singapore)</option>
+              </select>
+            </label>
+          </div>
           <label>
             <span>Custom vocabulary corrections</span>
-            <input type="text" id="CLUELESS_CORRECTIONS" placeholder="preeya=Priya, terra form=Terraform, met forming=metformin" />
+            <div class="input-action">
+              <input type="text" id="CLUELESS_CORRECTIONS" placeholder="heard=Correct, spiro lactone=Spironolactone, terra form=Terraform" />
+              <button type="button" class="small" id="harvest-vocab" title="Extract terms &amp; names from your indexed context">Harvest from index</button>
+            </div>
           </label>
-          <p class="hint">
-            <code>heard=correct</code> pairs, comma-separated. Teach it names and terms it keeps
-            mishearing. For accents, try a closer locale above.
-          </p>
+          <p class="hint" id="vocab-status">Comma-separated <code>heard=Correct</code> pairs. Clueless also auto-learns proper nouns from your synced sources.</p>
         </section>
       </div>
 
-      <div class="panel" id="panel-model">
-        <h2>Model</h2>
-        <p class="sub">Clueless uses a model running on this Mac. Nothing is sent to a cloud service.</p>
+      <!-- 2. Context Sources -->
+      <div class="panel" id="panel-sources">
+        <h2>Context Sources</h2>
+        <p class="sub">Connect local folders, study decks, literature, courses or engineering tools. Toggle active sources live with <code>⌘⌥1–4</code>.</p>
 
         <section>
-          <h3>Detected providers</h3>
-          <div id="providers"><p class="hint">Checking…</p></div>
-          <p class="hint"><button class="small" id="recheck">Check again</button></p>
+          <h3>Index Status <span class="badge" id="sync-badge">Idle</span></h3>
+          <div class="chips-stat" id="index-counts"></div>
+          <div class="input-action">
+            <button type="button" class="primary small" id="sync-now">Save &amp; Sync Now</button>
+            <button type="button" class="small" id="sync-rebuild">Full Rebuild</button>
+            <span class="hint" id="sync-detail" style="margin: 0"></span>
+          </div>
         </section>
 
         <section>
-          <h3>Provider</h3>
+          <h3>Local Files &amp; Study Vaults <span class="badge ok">100% Offline</span></h3>
+          <label>
+            <span>Folders or files (PDFs, PowerPoint <code>.pptx</code>, Word <code>.docx</code>, Obsidian <code>.md</code>, <code>.txt</code>)</span>
+            <div class="input-action">
+              <input type="text" id="LOCAL_NOTES_DIRS" placeholder="/Users/you/Documents/Lectures;/Users/you/ObsidianVault" />
+              <button type="button" class="small" id="pick-notes-dir">Add folder…</button>
+              <button type="button" class="small" id="clear-notes-dir">Clear</button>
+            </div>
+          </label>
+          <p class="hint">Safe for every profile including Clinical mode — extracted locally using macOS PDFKit with zero network calls.</p>
+        </section>
+
+        <section id="academic-sources-section">
+          <h3>Student, Medical &amp; Research</h3>
+          <div class="row">
+            <label>
+              <span>Anki deck (<code>.apkg</code>, <code>.anki2</code>, or <code>auto</code>)</span>
+              <div class="input-action">
+                <input type="text" id="ANKI_PATH" placeholder="auto (or choose an .apkg file)" />
+                <button type="button" class="small" id="anki-auto">Auto</button>
+                <button type="button" class="small" id="pick-anki">Browse…</button>
+              </div>
+            </label>
+            <label style="max-width: 210px">
+              <span>Deck filter (optional)</span>
+              <input type="text" id="ANKI_DECK_FILTER" placeholder="e.g. Cardiology, Step2" />
+            </label>
+          </div>
+          <div id="network-academic-fields">
+            <div class="row">
+              <label>
+                <span>PubMed search topic or PMIDs</span>
+                <input type="text" id="PUBMED_QUERY" placeholder="e.g. heart failure SGLT2 guideline, 38192011" />
+              </label>
+              <label>
+                <span>Zotero / BibTeX (<code>.bib</code> or <code>.ris</code>)</span>
+                <div class="input-action">
+                  <input type="text" id="ZOTERO_BIB_PATH" placeholder="/Users/you/Zotero/library.bib" />
+                  <button type="button" class="small" id="pick-bib">Browse…</button>
+                </div>
+              </label>
+            </div>
+            <label style="margin-bottom: 0">
+              <span>Canvas LMS URL (university / medical school)</span>
+              <input type="text" id="CANVAS_URL" placeholder="https://canvas.instructure.com" />
+            </label>
+          </div>
+        </section>
+
+        <section id="general-sources-section">
+          <h3>Calendar &amp; Workspace</h3>
+          <div class="toggle">
+            <input type="checkbox" id="CALENDAR_ENABLED" />
+            <label for="CALENDAR_ENABLED" style="margin: 0; flex: 1">
+              <b>macOS Calendar context (EventKit)</b>
+              <span class="hint" style="margin: 0">Reads current meeting title, agenda &amp; attendee names locally (works with Apple Calendar, Exchange/Outlook &amp; Google accounts synced to macOS).</span>
+            </label>
+            <button type="button" class="small" id="allow-calendar">Allow Calendar</button>
+          </div>
+          <div id="notion-fields">
+            <label style="margin-bottom: 0">
+              <span>Notion page search filter (optional, requires Notion token below)</span>
+              <input type="text" id="NOTION_QUERY" placeholder="Blank indexes your 50 most recently edited shared pages" />
+            </label>
+          </div>
+        </section>
+
+        <section id="developer-sources-section">
+          <h3>Engineering Sources (Jira, Confluence &amp; GitHub)</h3>
+          <div class="row">
+            <label><span>Jira / Atlassian site</span><input type="text" id="JIRA_SITE" placeholder="yourteam.atlassian.net" /></label>
+            <label><span>Jira project key</span><input type="text" id="JIRA_PROJECT_KEY" placeholder="PROJ" /></label>
+          </div>
+          <div class="row">
+            <label><span>Board ID (optional)</span><input type="text" id="JIRA_BOARD_ID" placeholder="1234" /></label>
+            <label><span>Confluence space keys</span><input type="text" id="CONFLUENCE_SPACES" placeholder="ENG, ARCH" /></label>
+          </div>
+          <div class="row">
+            <label><span>GitHub organisation / owner</span><input type="text" id="GITHUB_ORG" placeholder="your-org" /></label>
+            <label><span>GitHub CLI account (optional)</span><input type="text" id="GITHUB_ACCOUNT" placeholder="uses active gh auth if blank" /></label>
+          </div>
+          <label style="margin-bottom: 0">
+            <span>GitHub repositories (indexes code + recent Pull Requests)</span>
+            <input type="text" id="GITHUB_REPOS" placeholder="service-api, web-client" />
+          </label>
+        </section>
+
+        <section id="credentials-section">
+          <h3>API Credentials <span class="badge">Stored locally in .env (0600)</span></h3>
+          <p class="hint" style="margin: 0 0 12px">Write-only: saved values are never sent back to this window. Leave a field blank to keep its current value.</p>
+          <div class="row">
+            <label>
+              <span>Atlassian Email <em class="badge" data-cred-badge="ATLASSIAN_EMAIL"></em></span>
+              <input type="text" id="cred-ATLASSIAN_EMAIL" placeholder="you@domain.com" autocomplete="off" />
+            </label>
+            <label>
+              <span>Atlassian API Token <em class="badge" data-cred-badge="ATLASSIAN_API_TOKEN"></em></span>
+              <input type="password" id="cred-ATLASSIAN_API_TOKEN" placeholder="Paste token to update…" autocomplete="off" />
+            </label>
+          </div>
+          <div class="row">
+            <label>
+              <span>GitHub PAT (optional if <code>gh</code> authed) <em class="badge" data-cred-badge="GITHUB_TOKEN"></em></span>
+              <input type="password" id="cred-GITHUB_TOKEN" placeholder="ghp_… or github_pat_…" autocomplete="off" />
+            </label>
+            <label>
+              <span>Canvas LMS Token <em class="badge" data-cred-badge="CANVAS_TOKEN"></em></span>
+              <input type="password" id="cred-CANVAS_TOKEN" placeholder="Canvas Access Token…" autocomplete="off" />
+            </label>
+          </div>
+          <div class="row">
+            <label style="margin-bottom: 0">
+              <span>Notion Integration Token <em class="badge" data-cred-badge="NOTION_TOKEN"></em></span>
+              <input type="password" id="cred-NOTION_TOKEN" placeholder="ntn_… or secret_…" autocomplete="off" />
+            </label>
+            <label style="margin-bottom: 0">
+              <span>NCBI PubMed Key (optional) <em class="badge" data-cred-badge="NCBI_API_KEY"></em></span>
+              <input type="password" id="cred-NCBI_API_KEY" placeholder="Optional higher rate limit" autocomplete="off" />
+            </label>
+          </div>
+        </section>
+      </div>
+
+      <!-- 3. Model -->
+      <div class="panel" id="panel-model">
+        <h2>Local Model</h2>
+        <p class="sub">Prompts are restricted to loopback (<code>127.0.0.1</code>) and never leave this Mac.</p>
+
+        <section>
+          <h3>Detected Providers</h3>
+          <div id="providers"><p class="hint">Checking…</p></div>
+          <div class="input-action" style="margin-top: 10px">
+            <button type="button" class="small" id="recheck">Check again</button>
+            <button type="button" class="small" id="test-model">Test answer</button>
+            <span class="hint" id="model-test-status" style="margin: 0"></span>
+          </div>
+        </section>
+
+        <section>
+          <h3>Model Selection</h3>
           <div class="row">
             <label>
               <span>Provider</span>
@@ -174,7 +372,7 @@
                 <option value="auto">Automatic</option>
                 <option value="ollama">Ollama</option>
                 <option value="openai_compat">llama.cpp / LM Studio (OpenAI-compatible)</option>
-                <option value="llamacpp">Run a GGUF file with llama.cpp</option>
+                <option value="llamacpp">Run a local GGUF file with llama.cpp</option>
                 <option value="foundation">Apple Intelligence (on-device)</option>
               </select>
             </label>
@@ -197,45 +395,23 @@
           <div id="gguf-fields">
             <label>
               <span>GGUF model file</span>
-              <input type="text" id="GGUF_PATH" placeholder="/Users/you/models/Llama-3.1-8B-Instruct-Q4_K_M.gguf" />
+              <div class="input-action">
+                <input type="text" id="GGUF_PATH" placeholder="/Users/you/models/Llama-3.1-8B-Instruct-Q4_K_M.gguf" />
+                <button type="button" class="small" id="pick-gguf">Browse…</button>
+              </div>
             </label>
-            <label>
+            <label style="margin-bottom: 0">
               <span>llama-server binary</span>
               <input type="text" id="LLAMACPP_SERVER" placeholder="/opt/homebrew/bin/llama-server" />
             </label>
           </div>
-          <p class="hint">Server URLs must be on this machine (127.0.0.1 or localhost).</p>
         </section>
       </div>
 
-      <div class="panel" id="panel-sources">
-        <h2>Work sources</h2>
-        <p class="sub">Index Jira, Confluence and code so answers can cite them. Toggle each during a meeting with ⌘⌥1–3.</p>
-        <section>
-          <h3>Jira &amp; Confluence</h3>
-          <div class="row">
-            <label><span>Jira site</span><input type="text" id="JIRA_SITE" placeholder="yourcompany.atlassian.net" /></label>
-            <label><span>Project key</span><input type="text" id="JIRA_PROJECT_KEY" placeholder="PROJ" /></label>
-          </div>
-          <div class="row">
-            <label><span>Board ID (optional)</span><input type="text" id="JIRA_BOARD_ID" placeholder="1234" /></label>
-            <label><span>Confluence spaces</span><input type="text" id="CONFLUENCE_SPACES" placeholder="ENG, DOCS" /></label>
-          </div>
-          <p class="hint">Credentials go in <code>.env</code> (ATLASSIAN_EMAIL, ATLASSIAN_API_TOKEN).</p>
-        </section>
-        <section>
-          <h3>Code</h3>
-          <div class="row">
-            <label><span>GitHub org</span><input type="text" id="GITHUB_ORG" placeholder="your-org" /></label>
-            <label><span>GitHub account</span><input type="text" id="GITHUB_ACCOUNT" placeholder="(uses gh auth if blank)" /></label>
-          </div>
-          <label><span>Repositories</span><input type="text" id="GITHUB_REPOS" placeholder="repo-a, repo-b" /></label>
-        </section>
-      </div>
-
+      <!-- 4. Advanced -->
       <div class="panel" id="panel-advanced">
         <h2>Advanced</h2>
-        <p class="sub">Generation parameters for live answers. Defaults were measured; change one at a time.</p>
+        <p class="sub">Generation parameters for live answers. Defaults were benchmarked for low latency and strict grounding.</p>
         <section>
           <div class="row">
             <label><span>Context size (tokens)</span><input type="number" id="LIVE_NUM_CTX" min="1024" max="32768" step="512" placeholder="4096" /></label>
@@ -243,46 +419,48 @@
             <label><span>Temperature</span><input type="number" id="LIVE_TEMPERATURE" min="0" max="1.5" step="0.05" placeholder="0.1" /></label>
           </div>
           <label><span>Summary model</span><input type="text" id="SUMMARY_MODEL" list="model-list" placeholder="llama3.1:8b" /></label>
-          <div class="toggle">
+          <div class="toggle" style="margin-bottom: 0">
             <input type="checkbox" id="DEVELOPER_MODE" />
-            <label for="DEVELOPER_MODE" style="margin: 0"><b>Developer mode outside the Developer profile</b></label>
+            <label for="DEVELOPER_MODE" style="margin: 0"><b>Enable Developer tabs &amp; work sources outside the Developer profile</b></label>
           </div>
         </section>
       </div>
 
+      <!-- 5. Logs -->
       <div class="panel" id="panel-logs">
         <h2>Logs</h2>
-        <p class="sub">Local only. Logs record lengths and timings, never transcript text.</p>
-        <div class="row" style="margin-bottom: 10px">
+        <p class="sub">Local diagnostics only. Logs record character counts and timings, never transcript text.</p>
+        <div class="input-action" style="margin-bottom: 10px">
           <select id="log-name" style="max-width: 220px">
             <option value="api">API server</option>
             <option value="mic">Microphone helper</option>
             <option value="system">System audio helper</option>
           </select>
-          <button class="small" id="log-refresh">Refresh</button>
+          <button type="button" class="small" id="log-refresh">Refresh</button>
         </div>
         <pre id="log-text"></pre>
       </div>
 
+      <!-- 6. About -->
       <div class="panel" id="panel-about">
         <h2>About</h2>
         <p class="sub" id="version"></p>
         <section>
-          <h3>Data</h3>
-          <p class="hint" style="margin: 0">Settings, logs and the search index are stored in <code id="data-dir"></code>. Transcripts are kept in memory only.</p>
+          <h3>Local Storage</h3>
+          <p class="hint" style="margin: 0">Settings, logs and the hybrid SQLite search index live in <code id="data-dir"></code>. Meeting transcripts stay in memory only.</p>
         </section>
         <section>
-          <h3>Walkthrough</h3>
-          <p class="hint" style="margin: 0 0 10px">Run the first-time setup again: profile, permissions, model and a test session.</p>
-          <button id="walkthrough">Run walkthrough</button>
+          <h3>Setup Wizard</h3>
+          <p class="hint" style="margin: 0 0 10px">Re-run the step-by-step setup wizard to configure persona defaults, permissions, context sources and audio checks.</p>
+          <button type="button" id="walkthrough">Run setup wizard…</button>
         </section>
       </div>
     </main>
 
     <footer>
-      <button class="primary" id="save">Save</button>
-      <button id="restart">Save &amp; restart</button>
-      <button id="cancel">Close</button>
+      <button type="button" class="primary" id="save">Save &amp; apply</button>
+      <button type="button" id="restart">Save &amp; restart</button>
+      <button type="button" id="cancel">Close</button>
       <span id="status"></span>
     </footer>
     <script src="settings.js"></script>

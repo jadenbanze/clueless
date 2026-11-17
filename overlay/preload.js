@@ -2,8 +2,6 @@
 
 const { contextBridge, ipcRenderer } = require('electron');
 
-// Minimal, explicitly enumerated surface. The renderer runs with
-// contextIsolation and no Node integration, so this is its only privileged API.
 const on = (channel) => (handler) => ipcRenderer.on(channel, (_event, payload) => handler(payload ?? {}));
 
 contextBridge.exposeInMainWorld('copilot', {
@@ -12,7 +10,7 @@ contextBridge.exposeInMainWorld('copilot', {
   setMode: (mode) => ipcRenderer.invoke('overlay:mode', mode),
   reportHeight: (height) => ipcRenderer.send('overlay:height', height),
   nudge: (direction) => ipcRenderer.invoke('overlay:nudge', direction),
-  ask: (question) => ipcRenderer.invoke('overlay:ask', question),
+  ask: (question, context) => ipcRenderer.invoke('overlay:ask', question, context),
   runIntent: (intent) => ipcRenderer.invoke('overlay:intent', intent),
   summarise: () => ipcRenderer.invoke('overlay:summarise'),
   togglePause: () => ipcRenderer.invoke('overlay:pause'),
@@ -22,6 +20,7 @@ contextBridge.exposeInMainWorld('copilot', {
   copy: (text) => ipcRenderer.invoke('overlay:copy', text),
   toast: (text) => ipcRenderer.invoke('overlay:toast', text),
   openSettings: () => ipcRenderer.invoke('overlay:open-settings'),
+  openCitation: (item) => ipcRenderer.invoke('overlay:open-citation', item),
 
   // Events
   onTranscript: on('transcript:turn'),
