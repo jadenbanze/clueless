@@ -35,6 +35,14 @@ echo "==> compiling Foundation Models bridge"
 swiftc -O -parse-as-library fmcli.swift -o build/fmcli \
     -framework FoundationModels -framework Foundation
 
+echo "==> compiling PDFKit extractor"
+swiftc -O -parse-as-library pdf.swift -o build/pdf \
+    -framework PDFKit -framework Foundation
+
+echo "==> compiling Calendar EventKit helper"
+swiftc -O -parse-as-library calendar.swift -o build/calendar \
+    -framework EventKit -framework Foundation
+
 echo "==> writing Info.plist"
 cat >"${BUNDLE}/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

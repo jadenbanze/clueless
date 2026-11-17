@@ -29,7 +29,8 @@
   },
   "overrides": {
     "minimatch@^9.0.0": "11.0.5",
-    "minimatch@^10.0.0": "11.0.5"
+    "minimatch@^10.0.0": "11.0.5",
+    "node-gyp": "11.1.0"
   },
   "engines": {
     "node": ">=22.12.0"
@@ -52,7 +53,9 @@
         "filter": [
           "CluelessTap.app/**/*",
           "ocr",
-          "fmcli"
+          "fmcli",
+          "pdf",
+          "calendar"
         ]
       },
       {
@@ -114,6 +117,7 @@
       "extendInfo": {
         "NSMicrophoneUsageDescription": "Clueless transcribes your microphone locally so it can answer questions in your meeting.",
         "NSAudioCaptureUsageDescription": "Clueless records meeting audio locally to transcribe it on this machine.",
+        "NSCalendarsFullAccessUsageDescription": "Clueless reads your current meeting's title, agenda and attendees locally to improve answers and transcription.",
         "LSUIElement": true
       },
       "icon": "build/Clueless.icns",
