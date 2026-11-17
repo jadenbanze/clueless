@@ -505,7 +505,9 @@ def _fetch_pubmed_articles(query: str, max_results: int = 40) -> list[tuple[str,
             f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
             f"?db=pubmed&retmode=json&sort=relevance&retmax={max_results}&term={term}{key_param}"
         )
-        req = urllib.request.Request(search_url, headers={"User-Agent": "Clueless/0.2 (local-assistant)"})
+        req = urllib.request.Request(  # noqa: S310
+            search_url, headers={"User-Agent": "Clueless/0.2 (local-assistant)"}
+        )
         with urllib.request.urlopen(req, timeout=30, context=tls.ssl_context()) as resp:  # noqa: S310  # nosec B310
             data = json.loads(resp.read().decode("utf-8"))
         pmid_list = (data.get("esearchresult") or {}).get("idlist") or []
@@ -518,7 +520,9 @@ def _fetch_pubmed_articles(query: str, max_results: int = 40) -> list[tuple[str,
         f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
         f"?db=pubmed&retmode=xml&id={ids_csv}{key_param}"
     )
-    req = urllib.request.Request(fetch_url, headers={"User-Agent": "Clueless/0.2 (local-assistant)"})
+    req = urllib.request.Request(  # noqa: S310
+        fetch_url, headers={"User-Agent": "Clueless/0.2 (local-assistant)"}
+    )
     with urllib.request.urlopen(req, timeout=45, context=tls.ssl_context()) as resp:  # noqa: S310  # nosec B310
         xml_bytes = resp.read()
 

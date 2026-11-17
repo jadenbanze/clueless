@@ -570,7 +570,7 @@ def fetch_github_prs(repo: str, token: str, max_prs: int = 25) -> list[tuple[str
         f"https://api.github.com/repos/{config.GITHUB_ORG}/{repo}/pulls"
         f"?state=all&sort=updated&direction=desc&per_page={max_prs}"
     )
-    req = urllib.request.Request(
+    req = urllib.request.Request(  # noqa: S310
         url,
         headers={
             "Authorization": f"Bearer {token}",
