@@ -3,21 +3,24 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Clueless — a meeting assistant that stays on your Mac</title>
-  <meta name="description" content="Clueless listens to a call, transcribes it on your Mac, and answers on a hotkey. Private, local, and open source.">
+  <title>Clueless — a meeting and study assistant that stays on your Mac</title>
+  <meta name="description" content="Clueless listens to calls and lectures, transcribes on-device on macOS 26, and answers on a hotkey with local hybrid RAG across your notes, Anki, PubMed, Jira, Confluence and code.">
   <link rel="icon" href="logo.svg" type="image/svg+xml">
   <style>
     :root {
       --bg: #f6f6f4;
+      --surface: #ffffff;
       --fg: #1c1c21;
       --muted: #5c5c64;
       --line: rgba(28, 28, 33, 0.12);
       --accent: #2a64c8;
-      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Helvetica, Arial, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
     }
     @media (prefers-color-scheme: dark) {
       :root {
         --bg: #141418;
+        --surface: #1c1c22;
         --fg: #ececef;
         --muted: #9b9ba4;
         --line: rgba(255, 255, 255, 0.12);
@@ -32,10 +35,10 @@
       color: var(--fg);
       font-family: var(--font);
       font-size: 17px;
-      line-height: 1.55;
+      line-height: 1.58;
     }
     a { color: var(--accent); text-underline-offset: 0.15em; }
-    .wrap { max-width: 40rem; margin: 0 auto; padding: 0 1.5rem; }
+    .wrap { max-width: 44rem; margin: 0 auto; padding: 0 1.5rem; }
     header { border-bottom: 1px solid var(--line); }
     header .wrap {
       display: flex;
@@ -55,31 +58,54 @@
     .brand img { width: 1.75rem; height: 1.75rem; border-radius: 0.4rem; }
     nav { display: flex; gap: 1.25rem; font-size: 0.95rem; }
     h1 {
-      margin: 4rem 0 1rem;
-      font-size: 2.4rem;
-      line-height: 1.15;
+      margin: 3.75rem 0 1rem;
+      font-size: 2.45rem;
+      line-height: 1.14;
       letter-spacing: -0.03em;
-      font-weight: 600;
+      font-weight: 650;
     }
-    .lede { margin: 0 0 2.5rem; font-size: 1.15rem; color: var(--muted); }
-    figure { margin: 0 0 3rem; }
+    .lede { margin: 0 0 2.25rem; font-size: 1.15rem; color: var(--muted); }
+    figure { margin: 0 0 2.75rem; }
     figure img {
       display: block;
       width: 100%;
       height: auto;
       border: 1px solid var(--line);
-      border-radius: 12px;
+      border-radius: 14px;
     }
-    section { border-top: 1px solid var(--line); padding: 1.6rem 0; }
+    section { border-top: 1px solid var(--line); padding: 1.65rem 0; }
     h2 {
-      margin: 0 0 0.35rem;
-      font-size: 0.75rem;
+      margin: 0 0 0.5rem;
+      font-size: 0.76rem;
       font-weight: 600;
       letter-spacing: 0.08em;
       text-transform: uppercase;
       color: var(--muted);
     }
-    section p { margin: 0; }
+    section p { margin: 0 0 0.8rem; }
+    section p:last-child { margin-bottom: 0; }
+    .personas {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr));
+      gap: 0.85rem;
+      margin-top: 0.75rem;
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      padding: 0.95rem 1.05rem;
+      font-size: 0.95rem;
+    }
+    .card b { display: block; margin-bottom: 0.25rem; font-size: 1rem; }
+    .card span { color: var(--muted); font-size: 0.9rem; line-height: 1.45; display: block; }
+    kbd {
+      font: 500 0.84em var(--mono);
+      padding: 0.1em 0.4em;
+      border-radius: 5px;
+      border: 1px solid var(--line);
+      background: var(--surface);
+    }
     footer {
       border-top: 1px solid var(--line);
       padding: 1.5rem 0 3rem;
@@ -97,36 +123,54 @@
       </a>
       <nav>
         <a href="https://github.com/jadenbanze/clueless">GitHub</a>
+        <a href="https://github.com/jadenbanze/clueless/blob/main/docs/personas.md">Docs</a>
         <a href="https://github.com/jadenbanze/clueless/releases/latest">Download</a>
       </nav>
     </div>
   </header>
   <main class="wrap">
-    <h1>A meeting assistant that stays on your Mac.</h1>
-    <p class="lede">Clueless listens to a call, transcribes it on the machine, and answers on a hotkey. The overlay is invisible to screen share. The meeting is not uploaded.</p>
+    <h1>A meeting and study assistant that stays on your Mac.</h1>
+    <p class="lede">Clueless listens to calls and lectures, transcribes them on-device, and answers on a hotkey grounded in your own notes, decks, papers or code. Invisible to screen share. Nothing uploaded.</p>
     <figure>
-      <img src="overlay.png" width="944" height="612" alt="The Clueless overlay answering a question during a meeting">
+      <img src="overlay.png" width="968" height="664" alt="The Clueless overlay answering a question during a session">
     </figure>
 
     <section>
-      <h2>Private</h2>
-      <p>Audio and the transcript stay in memory. They are not written to disk, and prompts go only to a model running on this Mac. The Medical profile turns network indexing off and redacts identifiers on screen. It is HIPAA-aware, not HIPAA-certified. Keeping the data local does not replace telling the other people on the call.</p>
+      <h2>Tailored Personas</h2>
+      <p>Choose your setup in the first-run wizard or switch live from the overlay toolbar's Settings gear without losing your transcript.</p>
+      <div class="personas">
+        <div class="card">
+          <b>Developer</b>
+          <span>Jira issues &amp; comments, Confluence sections, GitHub code &amp; Pull Requests, local docs, and model tuning.</span>
+        </div>
+        <div class="card">
+          <b>Student &amp; Clinical</b>
+          <span>Lecture PDFs, slides, Obsidian notes, offline Anki decks, PubMed &amp; Zotero, Canvas LMS — plus a zero-network, HIPAA-aware Clinical mode.</span>
+        </div>
+        <div class="card">
+          <b>General</b>
+          <span>Plain-language answers and recaps grounded in local files, Notion pages, macOS Calendar, and on-demand screen OCR.</span>
+        </div>
+      </div>
     </section>
+
     <section>
-      <h2>Local</h2>
-      <p>Use Ollama, llama.cpp, LM Studio, a GGUF file, or Apple Intelligence. Every model address has to be on this computer. It works with Teams, Zoom, Webex, FaceTime, and Skype, and it hears both sides. Ask from the last 90 seconds with ⌘⇧\, ask what to say with ⌘⇧A, or ask what was just said with ⌘⇧E.</p>
+      <h2>One-Key Actions</h2>
+      <p>Answer from the last 90 seconds with <kbd>⌘⇧\</kbd>, draft what to say next with <kbd>⌘⇧A</kbd>, capture and explain your active display with <kbd>⌘⇧E</kbd>, or stream a structured recap with <kbd>⌘⇧S</kbd>. Toggle context sources mid-call with <kbd>⌘⌥1</kbd>–<kbd>4</kbd>.</p>
     </section>
+
     <section>
-      <h2>Open source</h2>
-      <p>Clueless is <a href="https://github.com/jadenbanze/clueless/blob/main/LICENSE">MIT licensed</a>. The code is public, and anyone can contribute: a bug, a correction, or a pull request. Start with the <a href="https://github.com/jadenbanze/clueless/blob/main/CONTRIBUTING.md">contributing guide</a>. Report security issues <a href="https://github.com/jadenbanze/clueless/blob/main/SECURITY.md">in private</a>.</p>
+      <h2>Local &amp; Private by Construction</h2>
+      <p>Audio and transcripts stay in memory and are never written to disk. Prompts go strictly over loopback to Ollama, llama.cpp, LM Studio, a local GGUF file, or Apple Intelligence, backed by hybrid SQLite FTS5 + vector search. Clinical mode disables outbound indexing in code and redacts identifiers on screen (HIPAA-aware, not HIPAA-certified; local inference does not replace participant consent).</p>
     </section>
+
     <section>
-      <h2>What's next</h2>
-      <p>Later releases are aimed at performance and stability. Faster answers, fewer rough edges, and the same rule about the meeting: it stays on your Mac.</p>
+      <h2>Open Source</h2>
+      <p>Clueless is <a href="https://github.com/jadenbanze/clueless/blob/main/LICENSE">MIT licensed</a>. Read the <a href="https://github.com/jadenbanze/clueless/blob/main/docs/architecture.md">architecture</a>, start with the <a href="https://github.com/jadenbanze/clueless/blob/main/CONTRIBUTING.md">contributing guide</a>, or report vulnerabilities privately via <a href="https://github.com/jadenbanze/clueless/blob/main/SECURITY.md">SECURITY.md</a>.</p>
     </section>
   </main>
   <footer>
-    <div class="wrap">macOS 26 on Apple silicon. <a href="https://github.com/jadenbanze/clueless/blob/main/docs/privacy.md">Privacy notes</a>.</div>
+    <div class="wrap">macOS 26 (Tahoe) on Apple silicon · <a href="https://github.com/jadenbanze/clueless/blob/main/docs/privacy.md">Privacy verification</a></div>
   </footer>
 </body>
 </html>
