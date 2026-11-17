@@ -4,7 +4,7 @@
   "version": "0.2.1",
   "private": true,
   "author": "Clueless contributors",
-  "description": "Local-only meeting assistant — transcribes on-device and answers on a hotkey",
+  "description": "Local-only meeting assistant \u2014 transcribes on-device and answers on a hotkey",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
