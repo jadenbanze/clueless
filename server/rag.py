@@ -1,29 +1,85 @@
-"""Local retrieval over Jira issues and repository code.
+"""Local hybrid retrieval (dense vectors + SQLite FTS5 BM25 + RRF) across sources.
 
-Embeddings are computed by Ollama (`nomic-embed-text`) and stored in a local
-Chroma instance, so no text leaves the machine. Vectors are supplied explicitly
-rather than through Chroma's embedding_function, which keeps the model choice in
-one place.
+Key properties:
+  * Query embeddings are computed at most ONCE per ``search_all()`` call and
+    cached in a bounded thread-safe LRU cache (eliminating redundant loopback
+    HTTP round-trips across collections and speculative retries).
+  * If no embedding model is available (for example, Apple Intelligence-only
+    setups), indexing and search degrade cleanly to SQLite FTS5 BM25 keyword
+    retrieval instead of failing completely.
+  * Exact identifiers in the question (ticket keys like ``PROJ-123``, ``PMID``s,
+    or ``PR #42``) are pinned deterministically alongside semantic matches.
 """
 
 from __future__ import annotations
 
 import logging
 import re
+import threading
+from collections import OrderedDict
 from dataclasses import dataclass
 
 from . import config, providers
+from .providers.base import ProviderError
 from .vectorstore import VectorStore
 
 log = logging.getLogger(__name__)
 
-# Ignored by the lexical boost: too common to distinguish anything.
 _STOPWORDS = {
     "what", "which", "when", "where", "who", "whom", "this", "that", "these",
     "those", "with", "from", "have", "has", "had", "does", "doing", "about",
     "there", "their", "them", "they", "will", "would", "could", "should",
     "status", "ticket", "covers", "cover", "into", "over", "under", "been",
 }
+
+_EXACT_ID_PATTERNS = (
+    re.compile(r"\b([A-Z]{2,}[A-Z0-9_]*-\d+)\b"),
+    re.compile(r"\bPMID[:\s]*(\d{5,10})\b", re.IGNORECASE),
+    re.compile(r"\b(?:PR|pull request)\s*#?(\d{1,6})\b", re.IGNORECASE),
+)
+
+_EMBED_CACHE_MAX = 64
+_embed_cache: OrderedDict[tuple[str, str], list[float]] = OrderedDict()
+_embed_lock = threading.Lock()
+
+
+def _cached_query_embedding(query: str) -> list[float] | None:
+    norm = " ".join(query.lower().split())
+    if not norm:
+        return None
+    model_key = config.EMBED_MODEL
+    cache_key = (model_key, norm)
+    with _embed_lock:
+        hit = _embed_cache.get(cache_key)
+        if hit is not None:
+            _embed_cache.move_to_end(cache_key)
+            return hit
+
+    try:
+        vector = providers.embed([query])[0]
+    except Exception as error:
+        log.debug("query embedding unavailable (%s); using FTS5 BM25 fallback", error)
+        return None
+
+    with _embed_lock:
+        _embed_cache[cache_key] = vector
+        if len(_embed_cache) > _EMBED_CACHE_MAX:
+            _embed_cache.popitem(last=False)
+    return vector
+
+
+def extract_identifiers(text: str) -> list[str]:
+    found: list[str] = []
+    if not text:
+        return found
+    for key in _EXACT_ID_PATTERNS[0].findall(text):
+        found.append(key)
+    for pmid in _EXACT_ID_PATTERNS[1].findall(text):
+        found.append(pmid)
+        found.append(f"pmid:{pmid}")
+    for pr_num in _EXACT_ID_PATTERNS[2].findall(text):
+        found.append(f"pr#{pr_num}")
+    return found
 
 
 @dataclass
@@ -37,36 +93,84 @@ class Chunk:
         if source == "jira":
             return f"{self.metadata.get('key', '?')} — {self.metadata.get('summary', '')}"
         if source == "confluence":
-            return f"{self.metadata.get('space', '?')}: {self.metadata.get('title', '?')}"
-        return f"{self.metadata.get('repo', '?')}/{self.metadata.get('path', '?')}"
+            section = self.metadata.get("section")
+            title = self.metadata.get("title", "?")
+            suffix = f" › {section}" if section and section != title else ""
+            return f"{self.metadata.get('space', '?')}: {title}{suffix}"
+        if source == "code":
+            if self.metadata.get("kind") == "pr":
+                return f"{self.metadata.get('repo', '?')} PR #{self.metadata.get('pr_number', '?')} — {self.metadata.get('title', '')}"
+            return f"{self.metadata.get('repo', '?')}/{self.metadata.get('path', '?')}"
+        if source == "notes":
+            loc = self.metadata.get("location", "")
+            name = self.metadata.get("title") or self.metadata.get("path", "note")
+            return f"{name}" + (f" ({loc})" if loc else "")
+        if source == "anki":
+            deck = self.metadata.get("deck", "Anki")
+            front = self.metadata.get("front", "")[:48]
+            return f"{deck}: {front}" if front else deck
+        if source == "pubmed":
+            pmid = self.metadata.get("pmid")
+            cite_key = f"PMID:{pmid}" if pmid else self.metadata.get("key", "Paper")
+            return f"{cite_key} — {self.metadata.get('title', '')[:60]}"
+        if source == "canvas":
+            return f"{self.metadata.get('course', 'Course')}: {self.metadata.get('title', '?')}"
+        if source == "notion":
+            return f"Notion: {self.metadata.get('title', 'Untitled')}"
+        return str(self.metadata.get("title") or self.metadata.get("path") or "source")
+
+    def citation_meta(self) -> dict:
+        out = {"label": self.citation()}
+        url = self.metadata.get("url")
+        local_path = self.metadata.get("local_path")
+        if isinstance(url, str) and url.startswith("https://"):
+            out["url"] = url
+        elif isinstance(local_path, str) and local_path.startswith("/"):
+            out["path"] = local_path
+        return out
 
 
 class Store:
-    """Vector retrieval over the local SQLite store.
-
-    Replaces ChromaDB, which pulled ~360 MB of dependencies (kubernetes, grpc,
-    posthog, onnxruntime) for a narrow feature set we never used. See
-    vectorstore.py.
-    """
+    """Hybrid vector + BM25 retrieval over the local SQLite store."""
 
     def __init__(self) -> None:
         config.CHROMA_DIR.mkdir(parents=True, exist_ok=True)
         self._store = VectorStore(config.CHROMA_DIR / "vectors.sqlite3")
 
-    def add(self, collection: str, ids: list[str], texts: list[str],
-            metadatas: list[dict]) -> None:
+    def add(
+        self,
+        collection: str,
+        ids: list[str],
+        texts: list[str],
+        metadatas: list[dict],
+    ) -> None:
         if not ids:
             return
-        vectors = providers.embed(texts)
+        vectors: list[list[float]] | None = None
+        try:
+            vectors = providers.embed(texts)
+        except ProviderError as error:
+            log.info("indexing %d chunks into %s in BM25-only mode (%s)", len(ids), collection, error)
         self._store.add(collection, ids, texts, metadatas, vectors)
         log.info("indexed %d chunks into %s", len(ids), collection)
+
+    def delete_stale(self, collection: str, keep_ids: set[str]) -> int:
+        return self._store.delete_stale(collection, keep_ids)
 
     def count(self, collection: str) -> int:
         return self._store.count(collection)
 
+    def counts(self) -> dict[str, int]:
+        return self._store.counts()
+
     def search(
-        self, collection: str, query: str, top_k: int | None = None,
+        self,
+        collection: str,
+        query: str,
+        top_k: int | None = None,
         over_fetch: int | None = None,
+        query_vector: list[float] | None = None,
+        _skip_embed: bool = False,
     ) -> list[Chunk]:
         if not query.strip():
             return []
@@ -74,56 +178,73 @@ class Store:
             size = self._store.count(collection)
             if size == 0:
                 return []
-            # Over-fetch so duplicates and low-value files can be filtered
-            # without starving the result set.
-            requested = min(over_fetch or (top_k or config.RETRIEVE_TOP_K) * 4, size)
-            vector = providers.embed([query])[0]
-            results = self._store.query(collection, vector, requested)
+            limit = top_k or config.RETRIEVE_TOP_K
+            requested = min(over_fetch or limit * 4, size)
+
+            vector = query_vector
+            if vector is None and not _skip_embed:
+                vector = _cached_query_embedding(query)
+
+            vec_rows = self._store.query_with_ids(collection, vector, requested) if vector else []
+            fts_rows = self._store.fts_query(collection, query, requested)
+            pinned = self._store.exact_lookup(collection, extract_identifiers(query))
         except Exception as error:
             log.warning("retrieval from %s failed: %s", collection, error)
             return []
 
-        chunks: list[Chunk] = []
-        for document, metadata, similarity in results:
+        # Reciprocal Rank Fusion (RRF) on vector similarity + FTS5 BM25 ranks,
+        # anchored to vector cosine scale (~0.55–0.95) so cross-collection
+        # sorting in search_all remains well-calibrated.
+        candidates: dict[str, Chunk] = {}
+        rrf_bonus: dict[str, float] = {}
+
+        for rank, (item_id, document, metadata, similarity) in enumerate(vec_rows):
             metadata = metadata or {}
             path = str(metadata.get("path", "")).lower()
             if any(marker in path for marker in config.CODE_LOW_VALUE_MARKERS):
                 continue
-            # Already cosine similarity: higher is better.
-            chunks.append(Chunk(text=document, metadata=metadata, score=similarity))
+            candidates[item_id] = Chunk(text=document, metadata=metadata, score=similarity)
+            rrf_bonus[item_id] = rrf_bonus.get(item_id, 0.0) + 0.15 / (10 + rank)
 
-        # Keep only the best chunk per file. Several windows of one file crowd
-        # out other sources while adding little: they overlap heavily.
+        for rank, (item_id, document, metadata, _bm25) in enumerate(fts_rows):
+            metadata = metadata or {}
+            path = str(metadata.get("path", "")).lower()
+            if any(marker in path for marker in config.CODE_LOW_VALUE_MARKERS):
+                continue
+            if item_id not in candidates:
+                # BM25-only hit (either outside vector top-N or BM25-only index).
+                base = 0.62 if vec_rows else 0.75
+                candidates[item_id] = Chunk(text=document, metadata=metadata, score=base)
+            rrf_bonus[item_id] = rrf_bonus.get(item_id, 0.0) + 0.18 / (8 + rank)
+
+        for item_id, document, metadata in pinned:
+            metadata = metadata or {}
+            existing = candidates.get(item_id)
+            score = max(existing.score if existing else 0.0, 0.96)
+            candidates[item_id] = Chunk(text=document, metadata=metadata, score=score)
+            rrf_bonus[item_id] = rrf_bonus.get(item_id, 0.0) + 0.25
+
+        for item_id, chunk in candidates.items():
+            chunk.score += rrf_bonus.get(item_id, 0.0)
+
         best_per_file: dict[str, Chunk] = {}
-        for chunk in chunks:
+        for chunk in candidates.values():
             key = chunk.citation()
             if key not in best_per_file or chunk.score > best_per_file[key].score:
                 best_per_file[key] = chunk
 
-        # Store the boosted value on the chunk itself. Ranking has to survive
-        # the merge in search_all, which sorts a combined list; leaving the raw
-        # vector score here silently discarded the lexical boost and put
-        # read-path tickets above write-path ones again.
         for chunk in best_per_file.values():
             chunk.score = self._boost(chunk, query)
 
         ordered = sorted(best_per_file.values(), key=lambda c: c.score, reverse=True)
-        return ordered[: top_k or config.RETRIEVE_TOP_K]
+        return ordered[:limit]
 
     @staticmethod
     def _boost(chunk: Chunk, query: str) -> float:
-        """Vector score plus a small lexical bonus.
-
-        Embeddings are weak on short, distinctive tokens. Asking which ticket
-        covers the audit *write* path returned read-path tickets, because "read"
-        and "write" sit almost on top of each other in embedding space. Exact
-        keyword presence breaks that tie, and the bonus is deliberately small so
-        it re-orders near-equal candidates without overriding semantics.
-        """
         terms = {
             word
-            for word in re.findall(r"[a-z0-9]{4,}", query.lower())
-            if word not in _STOPWORDS
+            for word in re.findall(r"[a-z0-9]{3,}", query.lower())
+            if len(word) >= 4 and word not in _STOPWORDS
         }
         if not terms:
             return chunk.score
@@ -136,54 +257,56 @@ class Store:
     ) -> list[Chunk]:
         limit = top_k or config.RETRIEVE_TOP_K
         enabled = sources if sources is not None else {"jira", "code"}
+        active_sources = [src for src in enabled if src in config.SOURCE_COLLECTIONS]
+        if not active_sources or not query.strip():
+            return []
 
-        # A question that explicitly asks about a ticket should search tickets.
-        # Splitting the budget evenly meant "is there a Jira ticket about X"
-        # returned a source directory instead of the tickets, even though
-        # matching issues were indexed.
+        # Filter to collections that actually contain indexed items before
+        # paying for a loopback embedding call.
+        populated = [
+            (src, config.SOURCE_COLLECTIONS[src])
+            for src in active_sources
+            if self._store.count(config.SOURCE_COLLECTIONS[src]) > 0
+        ]
+        if not populated:
+            return []
+
+        # Compute query vector ONCE across all enabled collections.
+        query_vec = _cached_query_embedding(query)
+
         lowered = query.lower()
         ticket_intent = any(
             word in lowered
             for word in ("ticket", "jira", "story", "epic", "sprint", "backlog", "assigned")
         )
+        pr_intent = any(
+            word in lowered for word in ("pull request", " pr ", "merged", "review", "branch", "build")
+        )
 
-        jira: list[Chunk] = []
-        confluence: list[Chunk] = []
-        code: list[Chunk] = []
+        combined: list[Chunk] = []
+        for src, collection in populated:
+            per_source_k = max(2, limit // 2)
+            if src == "jira" and ticket_intent:
+                per_source_k = limit
+            elif src == "code" and ticket_intent and not pr_intent:
+                per_source_k = 1
+            elif len(populated) == 1:
+                per_source_k = limit
+            combined.extend(
+                self.search(
+                    collection,
+                    query,
+                    top_k=per_source_k,
+                    query_vector=query_vec,
+                    _skip_embed=True,
+                )
+            )
 
-        if "jira" in enabled:
-            jira = self.search(
-                config.JIRA_COLLECTION, query,
-                top_k=limit if ticket_intent else max(2, limit // 2),
-            )
-        if "confluence" in enabled:
-            confluence = self.search(
-                config.CONFLUENCE_COLLECTION, query,
-                top_k=max(2, limit // 2),
-            )
-        if "code" in enabled:
-            code = self.search(
-                config.CODE_COLLECTION, query,
-                top_k=1 if ticket_intent else max(2, limit // 2),
-            )
-
-        combined = jira + confluence + code
         combined.sort(key=lambda c: c.score, reverse=True)
         return combined[:limit]
 
 
 def compress_chunk(text: str, query: str, max_chars: int = 320) -> str:
-    """Keeps only the sentences of a chunk that plausibly answer the query.
-
-    Retrieval returns whole files or whole tickets; most of a chunk is unrelated
-    to the question. Sending all of it is the single largest contributor to
-    prompt length, and prompt evaluation dominates answer latency (~1.6s of a
-    2.2s answer at ~700 tok/s). Extracting matching sentences cuts the context
-    substantially while keeping the words that actually answer.
-
-    Falls back to the head of the chunk when nothing matches, so a chunk is never
-    silently emptied.
-    """
     body = text.strip()
     if len(body) <= max_chars:
         return body
@@ -218,22 +341,12 @@ def compress_chunk(text: str, query: str, max_chars: int = 320) -> str:
 
 
 def format_context(chunks: list[Chunk], query: str = "") -> str:
-    """Renders retrieved chunks for the prompt, each with a citable label.
-
-    Chunks are truncated per-item and overall. Code chunks are 120 lines, and
-    feeding several untruncated ones swamps the instruction budget — the model
-    stops following the brevity rules and prompt processing gets slow enough to
-    make a hotkey answer take 15s instead of 2s.
-    """
     if not chunks:
         return "(no matching context found)"
 
     blocks = []
     used = 0
     for chunk in chunks:
-        # Extract the sentences that match the question before truncating. Doing
-        # it the other way round keeps whichever 800 characters happen to come
-        # first, which is usually the least relevant part of a file.
         text = compress_chunk(chunk.text, query, config.CONTEXT_MAX_CHARS_PER_CHUNK)
         block = f"[{chunk.citation()}]\n{text}"
         if used + len(block) > config.CONTEXT_MAX_TOTAL_CHARS:

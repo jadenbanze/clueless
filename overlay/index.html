@@ -17,7 +17,6 @@
         background: transparent;
         -webkit-user-select: none;
         cursor: default;
-        /* Room for the shadow inside the transparent window. */
         padding: 6px;
       }
       button {
@@ -28,16 +27,13 @@
             stroke: currentColor; stroke-width: 1.8; stroke-linecap: round;
             stroke-linejoin: round; }
 
-      /* Liquid-glass approximation, simplified: one surface, one border,
-         one shadow. Dark base so light text stays readable over bright
-         documents and light-themed calls. */
       #surface {
         background: var(--surface);
         border: 1px solid var(--hairline);
         border-radius: 14px;
         backdrop-filter: blur(30px) saturate(170%);
         -webkit-backdrop-filter: blur(30px) saturate(170%);
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        box-shadow: var(--shadow);
         overflow: hidden;
         position: relative;
       }
@@ -67,7 +63,7 @@
 
       /* ---- Nav (shared by pill and card) ---- */
       .nav {
-        display: flex; align-items: center; gap: 6px;
+        display: flex; align-items: center; gap: 5px;
         height: 40px; padding: 0 6px 0 4px;
         position: relative;
       }
@@ -80,9 +76,10 @@
         width: 8px; height: 8px; border-radius: 50%; flex: none;
         background: var(--muted);
       }
-      #dot.live { background: var(--live); }
-      #dot.paused { background: var(--paused); }
-      #dot.speaking { background: var(--accent); animation: pulse 1.1s ease-in-out infinite; }
+      #dot.armed { background: transparent; border: 1.8px solid var(--live); }
+      #dot.live { background: var(--live); border: 0; }
+      #dot.paused { background: var(--paused); border: 0; }
+      #dot.speaking { background: var(--accent); border: 0; animation: pulse 1.1s ease-in-out infinite; }
       @keyframes pulse {
         0%, 100% { transform: scale(1); opacity: 1; }
         50% { transform: scale(1.4); opacity: 0.55; }
@@ -91,18 +88,17 @@
                 white-space: nowrap; }
       .spacer { flex: 1; }
       .icon-btn {
-        width: 28px; height: 28px; border-radius: 8px;
+        width: 27px; height: 27px; border-radius: 8px;
         display: grid; place-items: center; color: var(--muted);
         transition: background 0.12s ease, color 0.12s ease;
       }
       .icon-btn:hover { background: var(--hover); color: var(--fg); }
 
-      /* Source toggles: always visible in the card, revealed on hover in the
-         pill so the idle state stays one line of quiet chrome. */
+      /* Dynamic persona-matched source toggles */
       .sources { display: flex; gap: 2px; }
       .src {
         height: 24px; padding: 0 8px; border-radius: 7px;
-        font-size: 11.5px; color: var(--muted);
+        font-size: 11.5px; color: var(--muted); white-space: nowrap; flex: none;
         transition: background 0.12s ease, color 0.12s ease;
       }
       .src:hover { background: var(--hover); }
@@ -112,18 +108,14 @@
         border-radius: 50%; background: var(--live);
         margin-right: 5px; vertical-align: 1px;
       }
-      .src { white-space: nowrap; flex: none; }
       .src[hidden] { display: none; }
-      /* The card has the shortcuts link in its footer instead. */
       [data-mode="card"] #help { display: none; }
       [data-mode="pill"] .sources { display: none; }
       [data-mode="pill"] .nav:hover .sources { display: flex; }
       [data-mode="pill"] #collapse { display: none; }
       [data-mode="card"] #expand { display: none; }
 
-      /* Status and toast share one slot: the toast takes the status text's
-         place instead of floating over it, so the two can never overlap. */
-      .status-slot { position: relative; min-width: 64px; height: 20px;
+      .status-slot { position: relative; min-width: 60px; height: 20px;
                      display: flex; align-items: center; }
       #status { transition: opacity 0.12s ease; }
       .status-slot.toasting #status { opacity: 0; }
@@ -135,11 +127,9 @@
       .status-slot.toasting #toast { opacity: 1; }
       [data-mode="pill"] .nav:hover .status-slot { display: none; }
 
-      /* Shown only when no model provider is reachable. */
       #health { color: var(--paused); }
       #health[hidden] { display: none; }
 
-      /* Shortcut cheat-sheet, toggled by the ? button. */
       #shortcuts { display: none; padding: 10px 16px 4px; font-size: 12px; color: var(--muted); }
       #shortcuts.open { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; }
       #shortcuts kbd { justify-self: start; }
@@ -147,7 +137,6 @@
       /* ---- Card ---- */
       #card { display: none; border-top: 1px solid var(--faint); }
       [data-mode="card"] #card { display: block; }
-      /* max-height is set by renderer.js from the window's height cap. */
       #scroll { overflow-y: auto; }
 
       #empty { padding: 16px 16px 6px; color: var(--muted); font-size: 13px; }
@@ -171,9 +160,7 @@
       @keyframes blink { to { visibility: hidden; } }
       @keyframes fade-in { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
 
-      /* Summary formatting (built from DOM nodes, never innerHTML). */
       #answer-text.formatted { white-space: normal; font-size: calc(13.5px * var(--font-scale)); }
-      /* Profiles that hide the transcript (medical) drop the toggle entirely. */
       [data-hide-transcript] #transcript-toggle, [data-hide-transcript] #turns { display: none !important; }
       [data-hide-transcript] .foot-row { justify-content: flex-end; }
       #answer-text h3 { font-size: 13px; font-weight: 600; margin: 12px 0 4px; }
@@ -182,17 +169,24 @@
       #answer-text li { margin: 2px 0; }
       #answer-text p { margin: 0 0 4px; }
 
-      .answer-foot { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+      .answer-foot { display: flex; align-items: center; gap: 5px; margin-top: 10px; }
       #citations { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; min-width: 0; }
       .citation {
-        max-width: 220px; font-size: 11px; color: var(--muted);
+        max-width: 215px; font-size: 11px; color: var(--muted);
         background: var(--faint); border-radius: 6px; padding: 2px 7px;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        border: 1px solid transparent;
       }
+      .citation.clickable { cursor: pointer; }
+      .citation.clickable:hover { color: var(--fg); background: var(--hover); border-color: var(--hairline); }
+      .history-nav { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+      .history-nav[hidden] { display: none; }
+      .history-nav button { width: 20px; height: 20px; border-radius: 5px; display: grid; place-items: center; color: var(--muted); }
+      .history-nav button:hover:not(:disabled) { background: var(--hover); color: var(--fg); }
+      .history-nav button:disabled { opacity: 0.35; cursor: default; }
       .answer-foot .icon-btn { width: 24px; height: 24px; }
       .answer-foot .icon-btn svg { width: 13px; height: 13px; }
 
-      /* Chips: one row, primary first. Key caps appear on hover only. */
       .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px 4px; }
       .chip {
         height: 28px; padding: 0 11px; border-radius: 14px;
@@ -203,7 +197,7 @@
       }
       .chip:hover { background: var(--hover); }
       .chip.primary { background: var(--accent); border-color: transparent; color: #fff; }
-      .chip.primary:hover { background: #4b8ff7; }
+      .chip.primary:hover { background: var(--accent-hover); }
       .chip kbd { display: none; }
       .chip:hover kbd { display: inline; }
       kbd {
@@ -212,7 +206,6 @@
         background: rgba(255, 255, 255, 0.12);
       }
 
-      /* Ask bar. */
       #ask {
         display: flex; align-items: center; gap: 6px;
         margin: 6px 12px 10px; padding: 0 4px 0 12px; height: 36px;
@@ -220,7 +213,7 @@
         border: 1px solid var(--faint);
         transition: border-color 0.12s ease;
       }
-      #ask.focused { border-color: rgba(59, 130, 246, 0.6); }
+      #ask.focused { border-color: rgba(59, 130, 246, 0.65); }
       #ask input {
         flex: 1; min-width: 0; background: none; border: 0; outline: none;
         color: var(--fg); font: 13px -apple-system, BlinkMacSystemFont, sans-serif;
@@ -234,7 +227,6 @@
       }
       #send svg { width: 13px; height: 13px; stroke-width: 2.2; }
 
-      /* Transcript, closed by default. */
       #transcript { border-top: 1px solid var(--faint); }
       .foot-row { display: flex; align-items: center; }
       #shortcuts-toggle { padding: 8px 16px; color: var(--muted); font-size: 12px; flex: none; }
@@ -272,14 +264,12 @@
             <svg viewBox="0 0 16 16"><path d="M8 2.5l6 11H2z"/><path d="M8 6.5v3M8 11.5v.01"/></svg>
           </button>
           <div class="spacer"></div>
-          <div class="sources" id="sources">
-            <button class="src" data-source="jira" title="Jira (⌘⌥1)">Jira</button>
-            <button class="src" data-source="confluence" title="Wiki (⌘⌥2)">Wiki</button>
-            <button class="src" data-source="code" title="Code (⌘⌥3)">Code</button>
-            <button class="src" data-source="screen" title="Screen (⌘⌥4)">Screen</button>
-          </div>
+          <div class="sources" id="sources"></div>
           <button class="icon-btn" id="pause" title="Pause listening">
             <svg viewBox="0 0 16 16" id="pause-icon"><path d="M5.5 3.5v9M10.5 3.5v9"/></svg>
+          </button>
+          <button class="icon-btn" id="settings-btn" title="Settings (⌘,)">
+            <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.2"/><path d="M8 2v1.6M8 12.4V14M2 8h1.6M12.4 8H14M3.8 3.8l1.1 1.1M11.1 11.1l1.1 1.1M12.2 3.8l-1.1 1.1M4.9 11.1l-1.1 1.1"/></svg>
           </button>
           <button class="icon-btn" id="expand" title="Open (⌘⇧\)">
             <svg viewBox="0 0 16 16"><path d="M4 6l4 4 4-4"/></svg>
@@ -299,12 +289,12 @@
           <div id="shortcuts">
             <kbd>⌘⇧\</kbd><span>Answer from the last 90 seconds</span>
             <kbd>⌘⇧A</kbd><span>What should I say?</span>
-            <kbd>⌘⇧E</kbd><span>Explain what was just said</span>
-            <kbd>⌘⇧S</kbd><span>Recap the meeting</span>
-            <kbd>⌘⇧↩</kbd><span>Type a question</span>
+            <kbd>⌘⇧E</kbd><span>Explain screen or concept</span>
+            <kbd>⌘⇧S</kbd><span>Recap the session</span>
+            <kbd>⌘⇧↩</kbd><span>Type a question or follow-up</span>
             <kbd>⌘⇧H</kbd><span>Collapse / hide / show</span>
-            <kbd>⌘⌥1–4</kbd><span>Toggle Jira, Wiki, Code, Screen</span>
-            <kbd>⌘,</kbd><span>Settings (while focused)</span>
+            <kbd>⌘⌥1–4</kbd><span id="shortcuts-sources">Toggle active context sources</span>
+            <kbd>⌘,</kbd><span>Settings</span>
           </div>
           <div id="scroll">
             <div id="answer">
@@ -312,6 +302,11 @@
               <div id="answer-text"></div>
               <div class="answer-foot">
                 <div id="citations"></div>
+                <div class="history-nav" id="history-nav" hidden>
+                  <button id="hist-prev" title="Previous answer">‹</button>
+                  <span id="hist-pos">1/1</span>
+                  <button id="hist-next" title="Next answer">›</button>
+                </div>
                 <button class="icon-btn" id="copy" title="Copy answer">
                   <svg viewBox="0 0 16 16"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 3.5v-.5a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h.5"/></svg>
                 </button>
@@ -331,7 +326,7 @@
           </div>
 
           <form id="ask" autocomplete="off">
-            <input id="ask-input" type="text" placeholder="Ask about this meeting…" spellcheck="false" />
+            <input id="ask-input" type="text" placeholder="Ask about this session or follow up…" spellcheck="false" />
             <kbd id="ask-key">⌘⇧↩</kbd>
             <button id="send" type="submit" title="Send">
               <svg viewBox="0 0 16 16"><path d="M8 12.5v-9M4 7.5l4-4 4 4"/></svg>

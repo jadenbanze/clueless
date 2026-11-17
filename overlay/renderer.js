@@ -1,10 +1,8 @@
 'use strict';
 
-// Overlay renderer. Two modes, owned by main (it owns the window bounds):
-//   pill — one line of quiet chrome: status, timer, pause, expand
-//   card — answer, action chips, ask bar, collapsible transcript
-// The renderer asks for a mode change; main resizes the window and echoes the
-// mode back, so hotkeys and clicks converge on the same state.
+// Overlay renderer:
+//   pill — quiet status bar (armed vs listening, timer, pause, settings, expand)
+//   card — streaming answers/summaries, clickable citations, Q&A history, ask bar
 
 const $ = (id) => document.getElementById(id);
 
@@ -14,26 +12,48 @@ const scrollEl = $('scroll');
 const dotEl = $('dot');
 const statusEl = $('status');
 const toastEl = $('toast');
+const sourcesEl = $('sources');
 const answerEl = $('answer');
 const questionEl = $('question');
 const answerTextEl = $('answer-text');
 const citationsEl = $('citations');
+const historyNavEl = $('history-nav');
+const histPrevBtn = $('hist-prev');
+const histNextBtn = $('hist-next');
+const histPosEl = $('hist-pos');
 const askForm = $('ask');
 const askInput = $('ask-input');
 const transcriptEl = $('transcript');
 const turnsEl = $('turns');
 
 const MAX_VISIBLE_TURNS = 60;
+const MAX_ANSWER_HISTORY = 12;
+const DEFAULT_LABELS = {
+  jira: 'Jira',
+  confluence: 'Wiki',
+  code: 'Code',
+  notes: 'Notes',
+  anki: 'Anki',
+  pubmed: 'Papers',
+  canvas: 'Canvas',
+  notion: 'Notion',
+  calendar: 'Cal',
+  screen: 'Screen',
+};
 
 let mode = 'pill';
 let maxWindowHeight = 600;
 let capturing = false;
+let armed = false;
 let paused = false;
 let speaking = false;
+let activeSpeaker = 'them';
 let sessionStart = null;
 let askFocused = false;
+let answerHistory = [];
+let historyIndex = -1;
 
-// ---------------------------------------------------------------- mode
+// ---------------------------------------------------------------- mode & rAF resize
 
 function applyMode(next) {
   mode = next;
@@ -42,8 +62,8 @@ function applyMode(next) {
 }
 
 window.copilot.onMode((payload) => applyMode(payload.mode));
-window.copilot.onConfig((config) => {
-  maxWindowHeight = config.maxHeight ?? maxWindowHeight;
+window.copilot.onConfig((cfg) => {
+  maxWindowHeight = cfg.maxHeight ?? maxWindowHeight;
   fit();
 });
 
@@ -56,11 +76,11 @@ $('hide').addEventListener('click', () => {
   releaseAsk();
   window.copilot.hide();
 });
+$('settings-btn').addEventListener('click', () => {
+  releaseAsk();
+  window.copilot.openSettings();
+});
 
-// ---------------------------------------------------------------- sizing
-
-// The window is sized to its content. The scroll region gets whatever height
-// is left under the cap, so a long answer scrolls instead of being clipped.
 function fit() {
   if (mode !== 'card') {
     scrollEl.style.maxHeight = '';
@@ -71,16 +91,26 @@ function fit() {
   scrollEl.style.maxHeight = `${room}px`;
 }
 
+let resizeRaf = 0;
+let lastReportedHeight = 0;
 new ResizeObserver(() => {
-  if (mode !== 'card') return;
-  // body padding (6px each side) is part of the window.
-  window.copilot.reportHeight(Math.ceil(surfaceEl.getBoundingClientRect().height) + 12);
+  if (mode !== 'card' || resizeRaf) return;
+  resizeRaf = requestAnimationFrame(() => {
+    resizeRaf = 0;
+    if (mode !== 'card') return;
+    const nextHeight = Math.ceil(surfaceEl.getBoundingClientRect().height) + 12;
+    if (Math.abs(nextHeight - lastReportedHeight) >= 2) {
+      lastReportedHeight = nextHeight;
+      window.copilot.reportHeight(nextHeight);
+    }
+  });
 }).observe(surfaceEl);
 
 // ---------------------------------------------------------------- status
 
 function renderStatus() {
   dotEl.classList.toggle('live', capturing && !paused);
+  dotEl.classList.toggle('armed', !capturing && armed && !paused);
   dotEl.classList.toggle('paused', paused);
   dotEl.classList.toggle('speaking', speaking && capturing && !paused);
 
@@ -91,9 +121,12 @@ function renderStatus() {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = String(seconds % 60).padStart(2, '0');
-    statusEl.textContent = h ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
+    const timer = h ? `${h}:${String(m).padStart(2, '0')}:${s}` : `${m}:${s}`;
+    statusEl.textContent = speaking ? `${timer} · ${activeSpeaker === 'me' ? 'You' : 'Call'}` : timer;
+  } else if (armed) {
+    statusEl.textContent = 'Ready';
   } else {
-    statusEl.textContent = capturing ? 'Listening' : 'Not capturing';
+    statusEl.textContent = capturing ? 'Listening' : 'Idle';
   }
 
   const pauseBtn = $('pause');
@@ -115,12 +148,14 @@ window.copilot.onStatus((status) => {
     if (capturing && !sessionStart) sessionStart = Date.now();
     if (!capturing) sessionStart = null;
   }
+  if (typeof status.armed === 'boolean') armed = status.armed;
   if (typeof status.paused === 'boolean') paused = status.paused;
   renderStatus();
 });
 
 window.copilot.onActivity((activity) => {
   speaking = Boolean(activity?.speaking);
+  if (activity?.speaker) activeSpeaker = activity.speaker;
   renderStatus();
 });
 
@@ -135,7 +170,6 @@ window.copilot.onToast((payload) => {
   toastTimer = setTimeout(() => statusSlotEl.classList.remove('toasting'), 1600);
 });
 
-// Health: main polls /health and reports whether a model provider is usable.
 const healthEl = $('health');
 window.copilot.onHealth((health) => {
   const problem = health?.problem;
@@ -155,23 +189,35 @@ $('help').addEventListener('click', () => {
   }
 });
 
-// ---------------------------------------------------------------- sources
+// ---------------------------------------------------------------- dynamic sources
 
-window.copilot.onSources((state) => {
-  for (const chip of document.querySelectorAll('.src')) {
-    const name = chip.dataset.source;
-    // The API only reports sources this mode offers; an absent key means
-    // "not available here", so hide it rather than show a dead control.
-    chip.hidden = !Object.prototype.hasOwnProperty.call(state ?? {}, name);
-    chip.classList.toggle('on', Boolean(state?.[name]));
+function renderSources(state) {
+  const labels = { ...DEFAULT_LABELS, ...(state?.labels ?? {}) };
+  let keys = Array.isArray(state?.hotkey_sources) && state.hotkey_sources.length
+    ? state.hotkey_sources
+    : Object.keys(DEFAULT_LABELS).filter((k) => Object.prototype.hasOwnProperty.call(state ?? {}, k));
+  keys = keys.slice(0, 4);
+
+  sourcesEl.replaceChildren(...keys.map((name, idx) => {
+    const btn = document.createElement('button');
+    btn.className = `src${state?.[name] ? ' on' : ''}`;
+    btn.dataset.source = name;
+    const label = labels[name] ?? name;
+    btn.textContent = label;
+    btn.title = `${label} (⌘⌥${idx + 1})`;
+    btn.addEventListener('click', () => window.copilot.toggleSource(name));
+    return btn;
+  }));
+
+  const shortcutNames = keys.map((k) => labels[k] ?? k).join(', ');
+  if (shortcutNames) {
+    $('shortcuts-sources').textContent = `Toggle ${shortcutNames}`;
   }
-});
-
-for (const chip of document.querySelectorAll('.src')) {
-  chip.addEventListener('click', () => window.copilot.toggleSource(chip.dataset.source));
 }
 
-// ---------------------------------------------------------------- answers
+window.copilot.onSources(renderSources);
+
+// ---------------------------------------------------------------- answers & history
 
 let streamingBuffer = '';
 let streaming = false;
@@ -184,6 +230,77 @@ function setQuestion(text) {
   questionEl.textContent = text ?? '';
 }
 
+function renderCitations(answer) {
+  citationsEl.replaceChildren();
+  const seen = new Set();
+  const links = Array.isArray(answer?.citation_links) && answer.citation_links.length
+    ? answer.citation_links
+    : (answer?.citations ?? []).map((label) => ({ label }));
+
+  for (const item of links) {
+    const label = String(item?.label ?? '').trim();
+    if (!label || seen.has(label)) continue;
+    seen.add(label);
+
+    const hasTarget = Boolean(item?.url || item?.path);
+    const tag = document.createElement(hasTarget ? 'button' : 'span');
+    tag.className = `citation${hasTarget ? ' clickable' : ''}`;
+    tag.textContent = label;
+    tag.title = hasTarget ? `${label} — click to open (⌥-click to copy)` : label;
+    if (hasTarget) {
+      tag.addEventListener('click', (event) => {
+        if (event.altKey) {
+          window.copilot.copy(label);
+          window.copilot.toast('Citation copied');
+          return;
+        }
+        window.copilot.openCitation({ url: item.url, path: item.path, label });
+      });
+    }
+    citationsEl.append(tag);
+  }
+}
+
+function renderHistoryControls() {
+  if (answerHistory.length <= 1 || streaming) {
+    historyNavEl.hidden = true;
+    return;
+  }
+  historyNavEl.hidden = false;
+  histPosEl.textContent = `${historyIndex + 1}/${answerHistory.length}`;
+  histPrevBtn.disabled = historyIndex <= 0;
+  histNextBtn.disabled = historyIndex >= answerHistory.length - 1;
+}
+
+function displayHistoryEntry(entry) {
+  if (!entry) return;
+  answerTextEl.classList.remove('streaming');
+  setQuestion(entry.question ?? '');
+  if (entry.format === 'summary') {
+    renderFormatted(answerTextEl, entry.text ?? '');
+  } else {
+    answerTextEl.classList.remove('formatted');
+    answerTextEl.textContent = entry.text ?? '';
+  }
+  renderCitations(entry);
+  renderHistoryControls();
+  showAnswer();
+}
+
+histPrevBtn.addEventListener('click', () => {
+  if (historyIndex > 0) {
+    historyIndex -= 1;
+    displayHistoryEntry(answerHistory[historyIndex]);
+  }
+});
+
+histNextBtn.addEventListener('click', () => {
+  if (historyIndex < answerHistory.length - 1) {
+    historyIndex += 1;
+    displayHistoryEntry(answerHistory[historyIndex]);
+  }
+});
+
 window.copilot.onAnswerStart((payload) => {
   streamingBuffer = '';
   streaming = true;
@@ -191,21 +308,19 @@ window.copilot.onAnswerStart((payload) => {
   answerTextEl.textContent = '';
   answerTextEl.classList.add('streaming');
   citationsEl.replaceChildren();
+  historyNavEl.hidden = true;
   setQuestion(payload?.question);
   showAnswer();
 });
 
 window.copilot.onAnswerDelta((payload) => {
   if (!streaming) return;
-  // Redacting profiles send the whole redacted answer so far (`full`), because
-  // a name split across two fragments cannot be redacted fragment by fragment.
   if (typeof payload?.full === 'string') streamingBuffer = payload.full;
   else streamingBuffer += payload?.text ?? '';
   answerTextEl.textContent = streamingBuffer;
 });
 
-// Walkthrough coach marks. Main drives the sequence; the renderer only
-// outlines the named element and places the tooltip on the far side of it.
+// Walkthrough coach marks
 const tourEl = document.getElementById('tour');
 let tourTarget = null;
 
@@ -237,44 +352,29 @@ window.copilot.onTour((step) => {
 document.getElementById('tour-next').addEventListener('click', () => window.copilot.tourNext());
 document.getElementById('tour-skip').addEventListener('click', () => window.copilot.tourEnd());
 
-// Profile: type scale and contrast come from tokens.css via data-profile;
-// layout differences are attributes the stylesheet keys off.
 window.copilot.onProfile((profile) => {
   const root = document.documentElement;
-  root.dataset.profile = profile?.name ?? 'general';
+  root.dataset.profile = profile?.effective_name ?? profile?.name ?? 'general';
+  root.dataset.clinical = profile?.clinical_mode ? 'true' : 'false';
   if (profile?.ui?.show_transcript === false) root.dataset.hideTranscript = '';
   else delete root.dataset.hideTranscript;
 });
 
-// The final answer replaces the stream: cleaning (dropping a spurious
-// "No info" suffix, removing headings) only happens once the whole response exists.
 window.copilot.onAnswer((answer) => {
   streaming = false;
-  answerTextEl.classList.remove('streaming');
-  if (answer.question !== undefined) setQuestion(answer.question);
-
-  if (answer.format === 'summary') {
-    renderFormatted(answerTextEl, answer.text ?? '');
-  } else {
-    answerTextEl.classList.remove('formatted');
-    answerTextEl.textContent = answer.text ?? '';
-  }
-
-  citationsEl.replaceChildren();
-  // De-duplicated: retrieval can surface the same file for several windows.
-  for (const citation of [...new Set(answer.citations ?? [])]) {
-    const tag = document.createElement('span');
-    tag.className = 'citation';
-    tag.textContent = citation;
-    tag.title = citation;
-    citationsEl.append(tag);
-  }
-  showAnswer();
+  const entry = {
+    question: answer.question !== undefined ? answer.question : questionEl.textContent,
+    text: answer.text ?? '',
+    citations: answer.citations ?? [],
+    citation_links: answer.citation_links ?? [],
+    format: answer.format ?? 'answer',
+  };
+  answerHistory.push(entry);
+  if (answerHistory.length > MAX_ANSWER_HISTORY) answerHistory.shift();
+  historyIndex = answerHistory.length - 1;
+  displayHistoryEntry(entry);
 });
 
-// Minimal markdown for summaries: "## heading", "- bullet", paragraphs.
-// Built from DOM nodes with textContent — the text is model output over an
-// untrusted transcript and must never be interpreted as HTML.
 function renderFormatted(container, text) {
   container.classList.add('formatted');
   container.replaceChildren();
@@ -319,10 +419,11 @@ $('clear').addEventListener('click', () => {
   answerTextEl.textContent = '';
   answerTextEl.classList.remove('streaming', 'formatted');
   citationsEl.replaceChildren();
+  historyNavEl.hidden = true;
   setQuestion('');
 });
 
-// ---------------------------------------------------------------- chips
+// ---------------------------------------------------------------- chips & ask bar
 
 for (const chip of document.querySelectorAll('.chip')) {
   chip.addEventListener('click', () => {
@@ -332,11 +433,6 @@ for (const chip of document.querySelectorAll('.chip')) {
   });
 }
 
-// ---------------------------------------------------------------- ask bar
-
-// The overlay window is not focusable, so it can never steal focus from the
-// meeting. Typing needs focus, so the ask bar borrows it on demand and hands it
-// back on Return or Esc.
 function openAsk() {
   if (askFocused) {
     askInput.focus();
@@ -360,14 +456,12 @@ askInput.addEventListener('mousedown', (event) => {
   }
 });
 
-// Main has made the window focusable and focused it.
 window.copilot.onAskFocus(() => {
   askFocused = true;
   askForm.classList.add('focused');
   askInput.focus();
 });
 
-// Focus left the window by other means (clicked another app).
 window.copilot.onAskBlur(() => {
   askFocused = false;
   askForm.classList.remove('focused');
@@ -378,7 +472,12 @@ askForm.addEventListener('submit', (event) => {
   const question = askInput.value.trim();
   askInput.value = '';
   releaseAsk();
-  if (question) window.copilot.ask(question);
+  if (!question) return;
+  const activeEntry = historyIndex >= 0 ? answerHistory[historyIndex] : null;
+  const followUp = activeEntry && answerEl.classList.contains('visible') && activeEntry.format !== 'summary'
+    ? { previous_question: activeEntry.question, previous_answer: activeEntry.text }
+    : null;
+  window.copilot.ask(question, followUp);
 });
 
 document.addEventListener('keydown', (event) => {
@@ -393,8 +492,6 @@ document.addEventListener('keydown', (event) => {
     window.copilot.openSettings();
     return;
   }
-  // Nudge only while the overlay holds focus. As a global shortcut, ⌘⌥←/→
-  // would steal tab switching from every browser and editor.
   if (event.metaKey && event.altKey && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
     event.preventDefault();
     window.copilot.nudge(event.key === 'ArrowLeft' ? -1 : 1);
@@ -414,7 +511,6 @@ window.copilot.onTranscript((turn) => {
   const who = document.createElement('span');
   who.className = 'who';
   who.textContent = turn.speaker === 'them' ? 'Them' : 'Me';
-  // textContent throughout — transcript text is untrusted input.
   row.append(who, document.createTextNode(turn.text));
   turnsEl.append(row);
   while (turnsEl.children.length > MAX_VISIBLE_TURNS) turnsEl.firstElementChild.remove();

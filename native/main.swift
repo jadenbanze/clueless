@@ -14,6 +14,7 @@
 import AVFoundation
 import AudioToolbox
 import CoreAudio
+import Darwin
 import Foundation
 
 // MARK: - Property helpers
@@ -114,20 +115,15 @@ func discoverAudioProcesses() -> [AudioProcess] {
     }
 }
 
-/// Resolves the executable name for a PID, so helper processes with an empty
-/// bundle ID can still be identified and matched.
+/// Resolves the executable name for a PID in-process via Darwin proc_pidpath
+/// (avoiding `/bin/ps` subprocess forks across every CoreAudio process object).
 func processName(for pid: pid_t) -> String {
     guard pid > 0 else { return "" }
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/bin/ps")
-    process.arguments = ["-p", "\(pid)", "-o", "comm="]
-    let pipe = Pipe()
-    process.standardOutput = pipe
-    process.standardError = FileHandle.nullDevice
-    guard (try? process.run()) != nil else { return "" }
-    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-    process.waitUntilExit()
-    return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    var pathBuffer = [CChar](repeating: 0, count: Int(MAXPATHLEN) * 4)
+    let length = proc_pidpath(pid, &pathBuffer, UInt32(pathBuffer.count))
+    guard length > 0 else { return "" }
+    let fullPath = String(cString: pathBuffer)
+    return (fullPath as NSString).lastPathComponent
 }
 
 // MARK: - Commands

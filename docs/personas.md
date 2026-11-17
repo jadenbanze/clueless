@@ -1,90 +1,73 @@
 # Profiles
 
-A profile is a set of defaults for one kind of work. Choose it in the walkthrough
-or in **Settings → General**, then restart. Every setting a profile changes can
-still be changed on its own, with one exception: Medical's network restriction
-can't be turned off from the UI.
+A profile is a set of defaults for one kind of work or study. Choose it in the
+setup wizard or in **Settings → General & Profile** — changes apply live without
+restarting or losing your current transcript.
 
 ![Choosing a profile](images/walkthrough-profile.png)
 
 ## Developer
 
-For meetings about tickets and code.
+For engineering meetings, standups, architecture reviews and incident calls.
 
-- **Sources:** Jira and Confluence are on by default. Code and screen context
-  are one keystroke away (`⌘⌥3`, `⌘⌥4`). Code starts off because in a meeting
-  that isn't about the codebase, retrieved source files mislead the model.
-- **Prompt:** prefers exact identifiers, such as ticket keys, file paths and
-  commands, when the sources contain them, and never invents one.
+- **Sources:** Jira, Confluence, Local files, and Calendar are available out of
+  the box; GitHub code & Pull Requests and Screen OCR are one keystroke away
+  (`⌘⌥3`, `⌘⌥4`). Code starts off so unrelated source files don't distract
+  high-level planning calls.
+- **Prompt:** prefers exact identifiers, ticket keys, PR numbers, file paths and
+  commands when the sources contain them, and never invents one.
 - **Summary:** Summary, Decisions, Action items (`owner — action`), and Open
   questions.
-- **Settings:** adds the Work sources, Advanced (context size, answer length,
-  temperature) and Logs tabs.
+- **Settings:** adds the Advanced (context size, answer length, temperature) and
+  Logs tabs.
 
-## Medical
+## Student (with Clinical Rotation Mode)
 
-For clinical meetings, handovers and case discussions.
+For university lectures, seminars, research groups and medical school.
+
+- **Sources:** Local study files (`.pdf` slides/textbooks via macOS PDFKit,
+  `.pptx`, `.docx`, Obsidian `.md`), offline **Anki** decks (`.apkg` or live
+  Anki2 collections), **PubMed** literature & **Zotero** bibliographies (`.bib`
+  / `.ris`), **Canvas LMS** courses/syllabi/assignments, **Notion**, **Calendar**
+  and **Screen OCR**.
+- **Prompt:** explains concepts clearly using exact terminology, mechanisms or
+  study findings from your lecture and reference material; never invents
+  citations, dosages or facts.
+- **Summary:** Overview, Key takeaways, Action items, and Questions to review.
+
+### Clinical / HIPAA-aware Sub-mode
+
+Enable **Clinical / HIPAA-aware rotation mode** inside the Student profile (in
+either the setup wizard or **Settings → General & Profile**) for clinical
+encounters, handovers and case discussions.
 
 > **HIPAA-aware, not HIPAA-certified.** Clueless runs entirely on your Mac, and
-> this profile reduces what is shown and what can leave the machine. It is not a
-> certified product, and nobody signs a Business Associate Agreement for it.
-> Consent, record-keeping and your organisation's policies remain your
-> responsibility.
+> Clinical mode restricts what is shown and blocks outbound network syncing. It
+> is not a certified medical device, and nobody signs a Business Associate
+> Agreement for it. Consent and institutional policies remain your responsibility.
 
-What it does:
+What Clinical mode enforces:
 
-- **No network access.** Jira, Confluence and GitHub indexing are disabled in
-  code, not just switched off by default. The indexers refuse to run, and the
-  setting can't be changed from the UI.
-- **Identifier redaction.** Everything shown, streamed, copied or exported
-  passes through a redactor before it leaves the API. That covers names after
-  titles (Dr, Nurse) and after "patient", dates and dates of birth, record
-  numbers, phone numbers, emails, street addresses and SSNs.
-- **Answers stream without leaking.** A name split across two streamed
-  fragments can't be redacted one fragment at a time. So the overlay receives
-  the whole redacted answer so far, minus the last unfinished word.
-- **Prompt:** plain clinical language. It never guesses a dosage, diagnosis,
-  lab value or patient detail that was not said.
-- **Summary:** clinical format. It refers to "the patient" rather than
-  repeating identifiers.
-- **Interface:** larger type, higher contrast, and no transcript panel. The
-  transcript is still captured so questions can be answered; it just isn't
-  displayed.
-
-![The overlay in the Medical profile](images/overlay-medical.png)
-
-What it does **not** do:
-
-- It does not redact the audio, or the transcript held in memory for answering
-  questions. Both stay on the Mac and are never written to disk.
-- Redaction is pattern-based. It is tested against common forms
-  (`server/test_phi.py`), but it will miss unusual ones, such as a surname
-  spoken with no title. Treat it as a second line of defence, not a guarantee.
-- It does not stop you sharing your own screen while the overlay is visible to
-  you. The overlay itself is excluded from screen capture.
+- **Zero outbound network indexing.** PubMed, Canvas, Notion, Jira, Confluence
+  and GitHub indexers are disabled in code (`NETWORK_INDEXING = False`). Offline
+  local reference PDFs/guidelines and offline Anki decks on disk remain usable.
+- **Identifier redaction.** Everything shown, streamed, copied or exported passes
+  through `server/phi.py` before leaving the API (names after titles or
+  "patient", dates/DOBs, MRNs, phone numbers, emails, addresses and SSNs).
+- **Safe streaming.** Redacted answers hold back unfinished trailing words so
+  multi-token names never leak mid-stream.
+- **Clinical summary & interface:** larger type, higher contrast, hidden live
+  transcript panel, and clinical summary rules that forbid invented dosages or
+  diagnoses and refer to `"the patient"`.
 
 ## General
 
-For everyone else: one-to-ones, interviews, planning, lectures.
+For everyday meetings: one-to-ones, interviews, planning and client calls.
 
-- **Sources:** transcript and screen only. The work-source controls are hidden.
+- **Sources:** Local notes/files, Notion, macOS Calendar, and Screen OCR.
 - **Prompt:** one or two plain sentences, without jargon.
 - **Summary:** What happened, Decisions, and Next steps.
-- **Capture:** starts by itself when a call app is playing call audio, and stops
-  a few minutes after the call ends.
+- **Capture:** starts automatically when a call app plays call audio, and stops
+  after the call ends.
 
 ![The overlay in the General profile](images/overlay-general.png)
-
-## Adding a profile
-
-Profiles live in `server/profiles.py`. A profile is:
-
-- some flags: `developer_mode`, `network_indexing`, `redact_phi`
-- one prompt line, appended to the shared rules
-- a summary prompt
-- a `ui` block: `font_scale`, `show_transcript`, and so on
-
-Persona styles hang off `[data-profile]` in `overlay/tokens.css`.
-
-Add assertions for any guarantee the profile makes to `server/test_profiles.py`.
-Run `test_brain` with `PROFILE=<name>` before opening a PR.

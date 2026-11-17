@@ -1,8 +1,4 @@
-"""Tests for the deterministic transcription-correction layer.
-
-Fast, offline, and covers the negative cases — a correction that fires inside an
-unrelated word is worse than no correction at all, because it silently rewrites
-what someone actually said.
+"""Tests for the transcription-correction, phonetic repair, and echo-bleed layers.
 
 Run: python3 -m server.test_corrections
 """
@@ -12,24 +8,16 @@ from __future__ import annotations
 import sys
 
 from . import config
-from .socket_server import apply_corrections
+from .socket_server import apply_corrections, is_acoustic_echo, rebuild_corrections
 
-# (input, expected)
 CASES = [
-    # Read-only, hyphenated and spaced.
-    ("We need a decision on red-only access.",
-     "We need a decision on read-only access."),
+    ("We need a decision on red-only access.", "We need a decision on read-only access."),
     ("decision on red only access", "decision on read only access"),
     ("redonly access", "read-only access"),
-    # Casing normalisation for acronyms and product names.
     ("kafka authentication failure", "Kafka authentication failure"),
     ("the jwt processing error", "the JWT processing error"),
-    # Organisation-specific terms are deliberately NOT defaults — see the
-    # user-supplied section below. Shipped defaults must be generic.
-    # Phrase-level repairs from the microphone path.
     ("coffee authentication failure is blocking", "Kafka authentication failure is blocking"),
     ("the audit right path remediation", "the audit write path remediation"),
-    # Generic engineering vocabulary.
     ("o auth token refresh", "OAuth token refresh"),
     ("graph ql schema", "GraphQL schema"),
     ("postgress migration failed", "Postgres migration failed"),
@@ -50,34 +38,28 @@ CASES = [
 
 
 def check_user_supplied() -> int:
-    """CLUELESS_CORRECTIONS must extend the defaults at import time.
-
-    This is how a medical, legal or finance user teaches the transcriber their
-    vocabulary without editing code. Values come from settings.json via
-    _setting(), with env as fallback — the Settings window writes the file.
-    """
-    import importlib
     import json
     import os
     import tempfile
     from pathlib import Path
 
     failures = 0
+    saved_env = os.environ.get("CLUELESS_DATA_DIR")
     with tempfile.TemporaryDirectory() as tmp:
         data_dir = Path(tmp)
         (data_dir / ".cache").mkdir()
         (data_dir / ".cache" / "settings.json").write_text(json.dumps({
-            # A name the transcriber spells inconsistently is the common case.
             "CLUELESS_CORRECTIONS": "acme=ACME,metformin=Metformin,hipaa=HIPAA,preeya=Priya,pria=Priya",
+        }))
+        (data_dir / ".cache" / "auto-vocabulary.json").write_text(json.dumps({
+            "pairs": {"spiro lactone": "Spironolactone"},
+            "terms": ["Priya", "Spironolactone", "Cardiomyopathy"],
         }))
         os.environ["CLUELESS_DATA_DIR"] = str(data_dir)
         os.environ.pop("CLUELESS_CORRECTIONS", None)
 
-        from server import config as cfg
-
-        importlib.reload(cfg)
-        importlib.reload(importlib.import_module("server.socket_server"))
-        from server.socket_server import apply_corrections
+        config.reload()
+        rebuild_corrections()
 
         for source, expected in [
             ("the acme project", "the ACME project"),
@@ -85,17 +67,47 @@ def check_user_supplied() -> int:
             ("hipaa compliance", "HIPAA compliance"),
             ("Preeya is investigating.", "Priya is investigating."),
             ("PRIA is investigating.", "Priya is investigating."),
+            # Phonetic proper-noun repair on unmapped near-miss spelling:
+            ("Priyah reviewed the chart.", "Priya reviewed the chart."),
+            ("spiro lactone mechanism", "Spironolactone mechanism"),
+            # Negative: must never rewrite common capitalized words or longer derivatives
+            ("Docker build passed on Monday.", "Docker build passed on Monday."),
+            ("Kafkaesque bureaucracy", "Kafkaesque bureaucracy"),
             ("unrelated text", "unrelated text"),
         ]:
             actual = apply_corrections(source)
             ok = actual == expected
             if not ok:
                 failures += 1
-            print(f"  [{'PASS' if ok else 'FAIL'}] settings.json: {source!r} -> {actual!r}")
+            print(f"  [{'PASS' if ok else 'FAIL'}] settings/vocab: {source!r} -> {actual!r}")
 
-        os.environ.pop("CLUELESS_DATA_DIR", None)
-        importlib.reload(cfg)
-        importlib.reload(importlib.import_module("server.socket_server"))
+        if saved_env is None:
+            os.environ.pop("CLUELESS_DATA_DIR", None)
+        else:
+            os.environ["CLUELESS_DATA_DIR"] = saved_env
+        config.reload()
+        rebuild_corrections()
+    return failures
+
+
+def check_echo_bleed() -> int:
+    failures = 0
+    cases = [
+        # Laptop speaker bleed picked up 400ms later on mic -> drop
+        ("Are we blocked on Kafka authentication", 100.4, "Are we still blocked on Kafka authentication?", 100.0, True),
+        # Genuine reply -> keep
+        ("Yes, Priya is fixing the token validator now.", 101.2, "Are we still blocked on Kafka authentication?", 100.0, False),
+        # Same words much later (>2.5s) -> keep (user repeating intentionally)
+        ("Are we blocked on Kafka authentication", 105.0, "Are we still blocked on Kafka authentication?", 100.0, False),
+        # Short acknowledgement ("yes", "right") -> never drop
+        ("Yes right", 100.3, "Yes right let us check", 100.0, False),
+    ]
+    for me_t, me_ts, them_t, them_ts, expected in cases:
+        got = is_acoustic_echo(me_t, me_ts, them_t, them_ts)
+        ok = got is expected
+        if not ok:
+            failures += 1
+        print(f"  [{'PASS' if ok else 'FAIL'}] echo={got} (expected {expected}): {me_t[:36]!r}")
     return failures
 
 
@@ -111,8 +123,11 @@ def main() -> int:
             print(f"         expected {expected!r}")
             print(f"         actual   {actual!r}")
 
-    print("\n  user-supplied vocabulary:")
+    print("\n  user-supplied & phonetic vocabulary:")
     failures += check_user_supplied()
+
+    print("\n  mic acoustic-bleed suppression:")
+    failures += check_echo_bleed()
 
     print(f"\n  corrections configured: {len(config.SPEECH_CORRECTIONS)}")
     print(f"===== {'PASS' if failures == 0 else f'{failures} FAILURE(S)'} =====")

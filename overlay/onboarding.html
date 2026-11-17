@@ -15,43 +15,56 @@
         font: var(--text-md)/1.55 var(--font); color: var(--fg); background: var(--surface-solid);
         -webkit-user-select: none;
       }
-      header { display: flex; justify-content: center; gap: 7px; padding: 22px 0 0; }
+      header { display: flex; justify-content: center; gap: 7px; padding: 20px 0 0; }
       .pip { width: 7px; height: 7px; border-radius: 50%; background: var(--hairline); transition: background var(--dur) var(--ease), width var(--dur) var(--ease); }
       .pip.done { background: var(--muted); }
       .pip.current { background: var(--accent); width: 20px; border-radius: 4px; }
-      main { flex: 1; overflow-y: auto; padding: 26px 56px 8px; }
+      main { flex: 1; overflow-y: auto; padding: 20px 52px 14px; }
       .step { display: none; animation: enter var(--dur) var(--ease); }
       .step.active { display: block; }
       @keyframes enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-      h1 { font-size: var(--text-2xl); font-weight: 650; margin: 0 0 6px; letter-spacing: -0.3px; }
-      .lead { color: var(--muted); font-size: var(--text-lg); margin: 0 0 22px; line-height: 1.5; }
+      h1 { font-size: var(--text-2xl); font-weight: 650; margin: 0 0 4px; letter-spacing: -0.3px; }
+      .lead { color: var(--muted); font-size: var(--text-lg); margin: 0 0 14px; line-height: 1.48; }
       .card {
         background: var(--surface-raised); border: 1px solid var(--hairline);
-        border-radius: 12px; padding: 14px 16px; margin-bottom: 10px;
+        border-radius: 12px; padding: 12px 15px; margin-bottom: 10px;
       }
       .card b { display: block; margin-bottom: 2px; }
       .card p { margin: 0; color: var(--muted); font-size: var(--text-sm); }
-      .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+      .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
       .choice {
         text-align: left; font: inherit; color: var(--fg); cursor: pointer;
+        white-space: normal;
         background: var(--surface-raised); border: 1px solid var(--hairline);
-        border-radius: 12px; padding: 16px; min-height: 128px;
+        border-radius: 12px; padding: 13px 15px; min-height: 108px;
       }
       .choice:hover { border-color: var(--muted); }
       .choice.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
-      .choice b { display: block; font-size: var(--text-lg); margin-bottom: 6px; }
-      .choice small { color: var(--muted); font-size: var(--text-sm); line-height: 1.45; }
-      .row { display: flex; align-items: center; gap: 12px; }
+      .choice b { display: block; font-size: var(--text-lg); margin-bottom: 5px; }
+      .choice small { color: var(--muted); font-size: var(--text-sm); line-height: 1.42; display: block; }
+      .clinical-card {
+        margin-top: 10px; padding: 11px 14px; border-radius: 11px;
+        background: rgba(10, 132, 255, 0.09); border: 1px solid rgba(10, 132, 255, 0.36);
+      }
+      .row { display: flex; align-items: center; gap: 10px; }
       .row .grow { flex: 1; min-width: 0; }
+      .field-row { display: flex; gap: 10px; margin-top: 8px; }
+      .field-row > label { flex: 1; display: block; }
+      label > span { display: block; font-size: 11.5px; color: var(--muted); margin-bottom: 4px; }
+      input[type="text"], input[type="password"] {
+        width: 100%; padding: 7px 10px; border-radius: 8px;
+        background: #121215; color: var(--fg); border: 1px solid var(--hairline); font: inherit;
+      }
+      input:focus { outline: none; border-color: var(--accent); }
       .badge { font-size: 11.5px; padding: 2px 8px; border-radius: var(--radius-pill); background: var(--faint); color: var(--muted); white-space: nowrap; }
       .badge.ok { background: rgba(52, 199, 89, 0.16); color: var(--ok); }
       .badge.warn { background: rgba(255, 159, 10, 0.16); color: var(--warn); }
       .badge.bad { background: rgba(255, 69, 58, 0.16); color: var(--danger); }
       .meter { height: 6px; border-radius: 3px; background: var(--faint); overflow: hidden; margin-top: 8px; }
       .meter > div { height: 100%; width: 0; background: var(--ok); transition: width 0.4s var(--ease); }
-      .consent { display: flex; gap: 10px; align-items: flex-start; margin-top: 16px; cursor: pointer; }
-      .consent input { width: 16px; height: 16px; margin-top: 3px; }
-      .note { font-size: var(--text-sm); color: var(--muted); margin: 10px 0 0; }
+      .consent { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; cursor: pointer; }
+      .consent input { width: 16px; height: 16px; margin-top: 3px; flex: none; }
+      .note { font-size: var(--text-sm); color: var(--muted); margin: 8px 0 0; }
       .note.warn { color: var(--warn); }
       code, .cmd { font-family: var(--font-mono); font-size: 12px; }
       .cmd {
@@ -74,17 +87,17 @@
         background: var(--faint); border: 1px solid var(--hairline);
       }
       footer {
-        display: flex; align-items: center; gap: 10px; padding: 14px 56px 22px;
+        display: flex; align-items: center; gap: 10px; padding: 12px 52px 20px;
       }
       button {
-        padding: 8px 18px; border-radius: 8px; font: inherit; cursor: pointer;
+        padding: 8px 18px; border-radius: 8px; font: inherit; cursor: pointer; white-space: nowrap;
         border: 1px solid var(--hairline); background: #24242a; color: var(--fg);
       }
       button:hover:not(:disabled) { background: #2c2c33; }
       button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
       button.primary:hover:not(:disabled) { background: var(--accent-hover); }
       button.link { background: none; border: 0; color: var(--muted); padding: 8px 6px; }
-      button.small { padding: 4px 10px; font-size: 12px; }
+      button.small { padding: 5px 11px; font-size: 12px; }
       button:disabled { opacity: 0.45; cursor: default; }
       .spacer { flex: 1; }
       [hidden] { display: none !important; }
@@ -96,21 +109,40 @@
       <!-- 1. Welcome and consent -->
       <section class="step" data-step="welcome">
         <h1>Welcome to Clueless</h1>
-        <p class="lead">A meeting assistant that runs entirely on this Mac. It listens, transcribes, and answers questions about the conversation on a hotkey.</p>
-        <div class="card"><b>Nothing leaves your Mac</b><p>Transcription, answers and summaries run on-device. Transcripts are kept in memory and never written to disk.</p></div>
+        <p class="lead">A session assistant that runs entirely on this Mac. It listens, transcribes, and answers questions on a hotkey.</p>
+        <div class="card"><b>Nothing leaves your Mac</b><p>Transcription, answers and summaries run on-device. Transcripts stay in memory and are never written to disk.</p></div>
         <div class="card"><b>Invisible to screen share</b><p>The overlay is excluded from screen recording, so others on the call do not see it.</p></div>
-        <div class="card"><b>Recording needs consent</b><p>Laws on recording conversations vary by place, and many require everyone's agreement. Tell the people you meet that you use a transcription assistant, and follow your organisation's policy.</p></div>
+        <div class="card"><b>Recording needs consent</b><p>Laws on recording conversations vary by jurisdiction, and many require everyone's agreement. Tell participants when you use a transcription assistant, and follow your institution's policy.</p></div>
         <label class="consent">
           <input type="checkbox" id="consent" />
-          <span>I understand, and I will get consent where it is required.</span>
+          <span>I understand, and I will obtain consent where required.</span>
         </label>
       </section>
 
-      <!-- 2. Profile -->
+      <!-- 2. Profile & About You -->
       <section class="step" data-step="profile">
         <h1>How will you use it?</h1>
-        <p class="lead">This sets sensible defaults. You can change it any time in Settings.</p>
+        <p class="lead">Pick a persona to set tailored prompts, context sources and layout. Changeable any time in Settings.</p>
         <div class="grid3" id="profiles"></div>
+
+        <div class="clinical-card" id="wiz-clinical-card" hidden>
+          <label class="consent" style="margin-top: 0">
+            <input type="checkbox" id="wiz-clinical" />
+            <span>
+              <b>Enable Clinical / HIPAA-aware rotation mode</b><br />
+              <small style="color: var(--muted)">Redacts patient identifiers on screen, hides the live transcript panel, and disables all network syncing (offline reference PDFs &amp; Anki decks remain available).</small>
+            </span>
+          </label>
+        </div>
+
+        <div class="card" id="wiz-about-card" style="margin-top: 10px">
+          <b>About you <span class="badge">Optional</span></b>
+          <p>Helps draft natural first-person replies and teaches speech recognition your name.</p>
+          <div class="field-row">
+            <label><span>Your name</span><input type="text" id="wiz-user-name" placeholder="e.g. Alex Rivera" /></label>
+            <label><span>Role or study track</span><input type="text" id="wiz-user-role" placeholder="e.g. Med student, CS undergrad, Engineer, PM" /></label>
+          </div>
+        </div>
         <p class="note" id="profile-note"></p>
       </section>
 
@@ -125,7 +157,7 @@
       <!-- 4. Permissions -->
       <section class="step" data-step="permissions">
         <h1>Permissions</h1>
-        <p class="lead">macOS asks before any app can hear audio. Clueless needs two kinds.</p>
+        <p class="lead">macOS asks before any app can capture audio or calendar context.</p>
         <div class="card">
           <div class="row">
             <div class="grow"><b>Microphone</b><p>Your side of the conversation.</p></div>
@@ -137,7 +169,7 @@
         </div>
         <div class="card">
           <div class="row">
-            <div class="grow"><b>System audio</b><p>Everyone else on the call. A short sound plays while this is checked.</p></div>
+            <div class="grow"><b>System audio</b><p>Everyone else on the call or lecture. Plays a short tone while checking.</p></div>
             <span class="badge" id="sys-badge">Not checked</span>
             <button class="small" id="sys-btn">Allow</button>
           </div>
@@ -146,24 +178,103 @@
         </div>
         <div class="card">
           <div class="row">
-            <div class="grow"><b>Screen recording <span class="badge">Optional</span></b><p>Only for "Explain screen" — reads text on your screen when you turn it on.</p></div>
+            <div class="grow"><b>Screen recording <span class="badge">Optional</span></b><p>For "Explain screen" (<code>⌘⇧E</code>) — reads slides or code on your display on demand.</p></div>
             <span class="badge" id="screen-badge"></span>
             <button class="small" id="screen-btn">Open Settings</button>
           </div>
         </div>
+        <div class="card" id="wiz-cal-perm-card">
+          <div class="row">
+            <div class="grow"><b>Calendar <span class="badge">Optional</span></b><p>Reads your current meeting's title, agenda and attendee names locally.</p></div>
+            <span class="badge" id="cal-badge">Optional</span>
+            <button class="small" id="cal-btn">Allow</button>
+          </div>
+        </div>
       </section>
 
-      <!-- 5. Model -->
+      <!-- 5. Context sources (persona-adaptive) -->
+      <section class="step" data-step="sources">
+        <h1>Connect your context</h1>
+        <p class="lead" id="wiz-sources-lead">Point Clueless at your notes or tools so answers cite real material. You can skip and configure this later in Settings.</p>
+
+        <!-- Universal offline folder -->
+        <div class="card">
+          <b>Local study / reference folder <span class="badge ok">Offline · PDF, PPTX, DOCX, MD</span></b>
+          <p>Lecture slides, clinical guidelines, Obsidian vaults, syllabi or docs on this Mac.</p>
+          <div class="row" style="margin-top: 8px">
+            <input type="text" id="wiz-notes-dir" class="grow" placeholder="/Users/you/Documents/Notes" />
+            <button type="button" class="small" id="wiz-pick-notes">Choose folder…</button>
+          </div>
+        </div>
+
+        <!-- Student & Medical Study -->
+        <div class="card" id="wiz-student-sources" hidden>
+          <b>Anki, PubMed &amp; Courseware</b>
+          <div class="field-row">
+            <label>
+              <span>Anki deck (<code>auto</code> or <code>.apkg</code>)</span>
+              <div class="row">
+                <input type="text" id="wiz-anki" placeholder="auto" />
+                <button type="button" class="small" id="wiz-anki-auto">Auto</button>
+                <button type="button" class="small" id="wiz-pick-anki">.apkg…</button>
+              </div>
+            </label>
+            <label id="wiz-pubmed-wrap">
+              <span>PubMed topic / PMIDs (optional)</span>
+              <input type="text" id="wiz-pubmed" placeholder="e.g. sepsis resuscitation guideline" />
+            </label>
+          </div>
+          <div class="field-row" id="wiz-canvas-wrap">
+            <label><span>Canvas LMS URL (optional)</span><input type="text" id="wiz-canvas-url" placeholder="https://canvas.instructure.com" /></label>
+            <label><span>Canvas Access Token</span><input type="password" id="wiz-canvas-token" placeholder="Optional token" autocomplete="off" /></label>
+          </div>
+        </div>
+
+        <!-- Developer -->
+        <div class="card" id="wiz-dev-sources" hidden>
+          <b>Jira, Confluence &amp; GitHub</b>
+          <div class="field-row">
+            <label><span>Jira site</span><input type="text" id="wiz-jira-site" placeholder="yourteam.atlassian.net" /></label>
+            <label><span>Project key</span><input type="text" id="wiz-jira-key" placeholder="PROJ" /></label>
+            <label><span>Wiki spaces</span><input type="text" id="wiz-wiki-spaces" placeholder="ENG, DOCS" /></label>
+          </div>
+          <div class="field-row">
+            <label><span>Atlassian email</span><input type="text" id="wiz-jira-email" placeholder="you@domain.com" autocomplete="off" /></label>
+            <label><span>Atlassian API token</span><input type="password" id="wiz-jira-token" placeholder="Stored in .env (0600)" autocomplete="off" /></label>
+          </div>
+          <div class="field-row">
+            <label><span>GitHub org / owner</span><input type="text" id="wiz-gh-org" placeholder="your-org" /></label>
+            <label><span>Repositories</span><input type="text" id="wiz-gh-repos" placeholder="api-service, web-app" /></label>
+          </div>
+        </div>
+
+        <!-- General Notion -->
+        <div class="card" id="wiz-general-sources" hidden>
+          <b>Notion Workspace <span class="badge">Optional</span></b>
+          <p>Paste an internal Notion integration token to index shared pages and meeting notes.</p>
+          <div class="field-row">
+            <label><span>Notion Integration Token</span><input type="password" id="wiz-notion-token" placeholder="ntn_… (stored in .env)" autocomplete="off" /></label>
+            <label><span>Page filter (optional)</span><input type="text" id="wiz-notion-query" placeholder="Blank indexes recent shared pages" /></label>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top: 10px">
+          <button type="button" class="small" id="wiz-sync-btn">Save &amp; sync in background</button>
+          <span class="note grow" id="wiz-sync-status" style="margin: 0"></span>
+        </div>
+      </section>
+
+      <!-- 6. Model -->
       <section class="step" data-step="model">
         <h1>Choose a model</h1>
-        <p class="lead">Answers come from a language model running on this Mac.</p>
+        <p class="lead">Answers come from a language model running locally on this Mac.</p>
         <div id="model-list"></div>
         <div class="card" id="model-missing" hidden>
           <b>No local model found</b>
-          <p>Install one of these, then press “Check again”. Transcription still works without a model.</p>
+          <p>Install one of these, then press “Check again”. Transcription and keyword search still work without one.</p>
           <div class="cmd"><span id="cmd-install">brew install ollama &amp;&amp; ollama serve</span><button class="small" data-copy="cmd-install">Copy</button></div>
           <div class="cmd"><span id="cmd-pull">ollama pull llama3.1:8b</span><button class="small" data-copy="cmd-pull">Copy</button></div>
-          <p class="note">Offline? Point Clueless at a downloaded <code>.gguf</code> file in Settings → Model.</p>
+          <p class="note">Offline? Point Clueless at a downloaded <code>.gguf</code> file in Settings → Local Model.</p>
         </div>
         <div class="row" style="margin-top: 12px">
           <button class="small" id="recheck-model">Check again</button>
@@ -172,7 +283,7 @@
         </div>
       </section>
 
-      <!-- 6. Test session -->
+      <!-- 7. Test session -->
       <section class="step" data-step="test">
         <h1>Try it</h1>
         <p class="lead">Say a sentence out loud. It should appear below within a few seconds.</p>
@@ -182,16 +293,17 @@
         <p class="note" id="test-note"></p>
       </section>
 
-      <!-- 7. Done -->
+      <!-- 8. Done -->
       <section class="step" data-step="done">
         <h1>You're set</h1>
-        <p class="lead">Clueless lives in the menu bar (◉). The overlay appears when a meeting starts.</p>
+        <p class="lead">Clueless lives in the menu bar (◉) and has a Settings gear right in the overlay toolbar.</p>
         <div class="card keys">
           <kbd>⌘⇧\</kbd><span>Answer from the last 90 seconds</span>
           <kbd>⌘⇧A</kbd><span>What should I say?</span>
-          <kbd>⌘⇧E</kbd><span>Explain what was just said</span>
-          <kbd>⌘⇧↩</kbd><span>Type a question</span>
-          <kbd>⌘⇧S</kbd><span>Summarise the meeting</span>
+          <kbd>⌘⇧E</kbd><span>Explain screen or concept</span>
+          <kbd>⌘⇧↩</kbd><span>Type a question or follow-up</span>
+          <kbd>⌘⇧S</kbd><span>Summarise the session</span>
+          <kbd>⌘⌥1–4</kbd><span>Toggle your persona's context sources</span>
           <kbd>⌘⇧H</kbd><span>Collapse, hide or show the overlay</span>
         </div>
       </section>

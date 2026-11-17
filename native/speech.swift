@@ -110,7 +110,8 @@ final class TranscriptionEngine {
     private var drainThread: Thread?
 
     private var pending: [AVAudioPCMBuffer] = []
-    private let pendingLock = NSLock()
+    private let pendingCondition = NSCondition()
+    private var preRoll: [AVAudioPCMBuffer] = []
     private var running = true
     private var flushTask: Task<Void, Never>?
     /// Frames handed to the analyzer so far, used to express flush position as
@@ -299,11 +300,12 @@ final class TranscriptionEngine {
                 memcpy(destination, raw, Int(buffer.mDataByteSize))
             }
 
-            pendingLock.lock()
+            pendingCondition.lock()
             pending.append(copy)
             // Bound memory if the drain thread falls behind.
             if pending.count > 400 { pending.removeFirst(pending.count - 400) }
-            pendingLock.unlock()
+            pendingCondition.signal()
+            pendingCondition.unlock()
         }
     }
 
@@ -323,25 +325,32 @@ final class TranscriptionEngine {
             memcpy(destinationData, sourceData, Int(from.mDataByteSize))
         }
 
-        pendingLock.lock()
+        pendingCondition.lock()
         pending.append(copy)
         if pending.count > 400 { pending.removeFirst(pending.count - 400) }
-        pendingLock.unlock()
+        pendingCondition.signal()
+        pendingCondition.unlock()
     }
 
     private func startDraining() {
         let thread = Thread { [weak self] in
             guard let self else { return }
-            while self.running {
-                self.pendingLock.lock()
+            while true {
+                self.pendingCondition.lock()
+                while self.pending.isEmpty && self.running {
+                    self.pendingCondition.wait(until: Date().addingTimeInterval(0.5))
+                }
+                if !self.running && self.pending.isEmpty {
+                    self.pendingCondition.unlock()
+                    break
+                }
                 let batch = self.pending
                 self.pending.removeAll(keepingCapacity: true)
-                self.pendingLock.unlock()
+                self.pendingCondition.unlock()
 
                 for buffer in batch {
                     self.emit(buffer)
                 }
-                Thread.sleep(forTimeInterval: 0.05)
             }
         }
         thread.name = "stt-drain-\(source)"
@@ -401,8 +410,12 @@ final class TranscriptionEngine {
                     // here keeps loud speech from inflating the floor.
                     noiseFloor = noiseFloor * 0.92 + rms * 0.08
                     silencedBuffers += 1
-                    // Track silence so the flusher knows when speech has paused.
-                    // Expressed in analyzer frames to match fedFrames.
+                    // Keep a 2-buffer (~150ms) pre-roll while silent so initial
+                    // consonants/plosives are not clipped when speech begins.
+                    if !isSpeaking {
+                        preRoll.append(buffer)
+                        if preRoll.count > 2 { preRoll.removeFirst(preRoll.count - 2) }
+                    }
                     let converted = Int(
                         Double(count) * (analyzerFormat.sampleRate / sourceFormat.sampleRate))
                     framesLock.lock()
@@ -430,8 +443,20 @@ final class TranscriptionEngine {
         if !isSpeaking {
             isSpeaking = true
             sink.send(["type": "activity", "speaker": source, "speaking": true])
+            // Flush onset pre-roll so the opening syllable reaches the recognizer.
+            let onset = preRoll
+            preRoll.removeAll(keepingCapacity: true)
+            for lead in onset {
+                convertAndYield(lead, converter: converter)
+            }
+        } else {
+            preRoll.removeAll(keepingCapacity: true)
         }
 
+        convertAndYield(buffer, converter: converter)
+    }
+
+    private func convertAndYield(_ buffer: AVAudioPCMBuffer, converter: AVAudioConverter) {
         let ratio = analyzerFormat.sampleRate / sourceFormat.sampleRate
         let capacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 1024
         guard let output = AVAudioPCMBuffer(pcmFormat: analyzerFormat, frameCapacity: capacity)
@@ -459,15 +484,20 @@ final class TranscriptionEngine {
         }
     }
 
-    func finish() async {
+    private func stopQueueAndTakeRemaining() -> [AVAudioPCMBuffer] {
+        pendingCondition.lock()
         running = false
-        drainThread?.cancel()
-        flushTask?.cancel()
-        // Flush anything still queued before closing the stream.
-        pendingLock.lock()
         let remaining = pending
         pending.removeAll()
-        pendingLock.unlock()
+        pendingCondition.broadcast()
+        pendingCondition.unlock()
+        return remaining
+    }
+
+    func finish() async {
+        let remaining = stopQueueAndTakeRemaining()
+        drainThread?.cancel()
+        flushTask?.cancel()
         remaining.forEach(emit)
 
         continuation.finish()

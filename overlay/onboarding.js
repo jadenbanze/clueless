@@ -1,17 +1,15 @@
 'use strict';
 
-// First-run walkthrough. A small step engine: each step may define
-//   enter()    runs when the step is shown (probes, fetches)
-//   validate() returns true to allow Continue, or a string explaining why not
-//   canSkip    whether Skip is offered
-// Progress is saved as ONBOARDING_STEP so a closed window resumes in place.
-// All dynamic text is set with textContent; nothing here parses HTML.
+// First-run setup wizard: consent -> persona (Developer / Student w/ Clinical
+// sub-mode / General) + About You -> system check -> permissions -> persona
+// context sources -> local model -> live microphone check -> tour.
 
 const api = window.onboardingApi;
 const $ = (id) => document.getElementById(id);
 
 const state = {
   profile: 'general',
+  clinicalMode: false,
   profiles: [],
   totalMemGB: 16,
   micOK: false,
@@ -20,10 +18,10 @@ const state = {
 };
 
 const PROFILE_NOTES = {
-  developer: 'Adds Jira, Confluence and code as context sources, plus logs and advanced tuning in Settings.',
-  medical: 'HIPAA-aware, not HIPAA-certified. Names, dates, record numbers and contact details are redacted on screen, '
-    + 'the transcript panel is hidden, and nothing is fetched from the network. Consent and any BAA obligations remain yours.',
-  general: 'Transcript and screen context only. Capture starts by itself when a call is detected.',
+  developer: 'Enables Jira, Confluence, GitHub code & PRs, local docs, logs and model tuning.',
+  student: 'Tailored for lectures, seminars, research and med school (slides/PDFs, Anki, PubMed, Canvas). Toggle Clinical mode above for HIPAA-aware clinical rotations.',
+  student_clinical: 'HIPAA-aware clinical sub-mode: patient identifiers redacted on screen, live transcript hidden, zero outbound network syncing (local PDFs & offline Anki stay available).',
+  general: 'Simple controls, plain-language answers, local notes, Notion and calendar context.',
 };
 
 function badge(el, text, kind) {
@@ -38,8 +36,43 @@ function note(el, text, warn = false) {
 }
 
 function meter(el, peak) {
-  // Peak is linear 0–1; speech typically sits around 0.05–0.3.
   el.style.width = `${Math.min(100, Math.round(Math.sqrt(Math.max(0, peak ?? 0)) * 140))}%`;
+}
+
+async function persistWizardSources() {
+  const settingsPayload = {
+    LOCAL_NOTES_DIRS: $('wiz-notes-dir').value.trim(),
+  };
+  const credsPayload = {};
+
+  if (state.profile === 'student') {
+    settingsPayload.ANKI_PATH = $('wiz-anki').value.trim();
+    if (!state.clinicalMode) {
+      settingsPayload.PUBMED_QUERY = $('wiz-pubmed').value.trim();
+      settingsPayload.CANVAS_URL = $('wiz-canvas-url').value.trim();
+      if ($('wiz-canvas-token').value.trim()) credsPayload.CANVAS_TOKEN = $('wiz-canvas-token').value.trim();
+    }
+  } else if (state.profile === 'developer') {
+    settingsPayload.JIRA_SITE = $('wiz-jira-site').value.trim();
+    settingsPayload.JIRA_PROJECT_KEY = $('wiz-jira-key').value.trim();
+    settingsPayload.CONFLUENCE_SPACES = $('wiz-wiki-spaces').value.trim();
+    settingsPayload.GITHUB_ORG = $('wiz-gh-org').value.trim();
+    settingsPayload.GITHUB_REPOS = $('wiz-gh-repos').value.trim();
+    if ($('wiz-jira-email').value.trim()) credsPayload.ATLASSIAN_EMAIL = $('wiz-jira-email').value.trim();
+    if ($('wiz-jira-token').value.trim()) credsPayload.ATLASSIAN_API_TOKEN = $('wiz-jira-token').value.trim();
+  } else {
+    settingsPayload.NOTION_QUERY = $('wiz-notion-query').value.trim();
+    if ($('wiz-notion-token').value.trim()) credsPayload.NOTION_TOKEN = $('wiz-notion-token').value.trim();
+  }
+
+  if (Object.keys(credsPayload).length > 0) {
+    const credRes = await api.saveCredentials(credsPayload);
+    if (credRes?.error) return credRes;
+    $('wiz-canvas-token').value = '';
+    $('wiz-jira-token').value = '';
+    $('wiz-notion-token').value = '';
+  }
+  return api.save(settingsPayload);
 }
 
 // ---------------------------------------------------------------- steps
@@ -54,15 +87,15 @@ const steps = [
     enter: renderProfiles,
     validate: () => true,
     async leave() {
-      const previous = (await api.state()).profile?.name;
+      const clinical = state.profile === 'student' && state.clinicalMode;
       await api.save({
         PROFILE: state.profile,
-        // Explicit so the profile's privacy default applies even if an earlier
-        // run saved a different choice.
-        REDACT_PHI: state.profile === 'medical' ? '1' : '0',
-        AUTO_DETECT_CALLS: state.profile === 'general' ? '1' : '0',
+        CLINICAL_MODE: clinical ? '1' : '0',
+        REDACT_PHI: clinical ? '1' : '0',
+        AUTO_DETECT_CALLS: '1',
+        USER_NAME: clinical ? '' : $('wiz-user-name').value.trim(),
+        USER_ROLE: clinical ? '' : $('wiz-user-role').value.trim(),
       });
-      if (previous !== state.profile) await api.restartApi();
     },
   },
   {
@@ -72,8 +105,18 @@ const steps = [
   },
   {
     id: 'permissions',
-    enter: refreshScreenStatus,
-    validate: () => (state.micOK && state.systemOK) || 'Both audio permissions are needed to transcribe a meeting. You can skip and grant them later.',
+    enter: refreshOptionalPermissions,
+    validate: () => (state.micOK && state.systemOK) || 'Both audio permissions are needed to transcribe a session. You can skip and grant them later.',
+    canSkip: true,
+  },
+  {
+    id: 'sources',
+    enter: renderSourcesStep,
+    validate: () => true,
+    async leave() {
+      const res = await persistWizardSources();
+      if (res?.error) flash(res.error);
+    },
     canSkip: true,
   },
   {
@@ -140,7 +183,7 @@ async function advance({ skip = false } = {}) {
   }
   $('next').disabled = true;
   try {
-    if (step.leave) await step.leave();
+    if (!skip && step.leave) await step.leave();
   } finally {
     $('next').disabled = false;
   }
@@ -162,7 +205,19 @@ $('next').addEventListener('click', () => advance());
 $('skip').addEventListener('click', () => advance({ skip: true }));
 $('back').addEventListener('click', () => show(current - 1));
 
-// ---------------------------------------------------------------- profile
+// ---------------------------------------------------------------- profile & clinical sub-mode
+
+function syncProfileNote() {
+  const isStudent = state.profile === 'student';
+  const clinical = isStudent && state.clinicalMode;
+  $('wiz-clinical-card').hidden = !isStudent;
+  $('wiz-about-card').hidden = clinical;
+  document.documentElement.dataset.profile = clinical ? 'medical' : state.profile;
+  document.documentElement.dataset.clinical = clinical ? 'true' : 'false';
+  $('profile-note').textContent = clinical
+    ? PROFILE_NOTES.student_clinical
+    : (PROFILE_NOTES[state.profile] ?? '');
+}
 
 function renderProfiles() {
   const container = $('profiles');
@@ -177,13 +232,70 @@ function renderProfiles() {
     card.append(title, tagline);
     card.addEventListener('click', () => {
       state.profile = profile.name;
-      document.documentElement.dataset.profile = profile.name;
+      if (profile.name !== 'student') {
+        state.clinicalMode = false;
+        $('wiz-clinical').checked = false;
+      }
       renderProfiles();
     });
     return card;
   }));
-  $('profile-note').textContent = PROFILE_NOTES[state.profile] ?? '';
+  syncProfileNote();
 }
+
+$('wiz-clinical').addEventListener('change', () => {
+  state.clinicalMode = $('wiz-clinical').checked;
+  syncProfileNote();
+});
+
+// ---------------------------------------------------------------- sources step
+
+function renderSourcesStep() {
+  const isStudent = state.profile === 'student';
+  const isClinical = isStudent && state.clinicalMode;
+  const isDev = state.profile === 'developer';
+  const isGen = state.profile === 'general';
+
+  $('wiz-student-sources').hidden = !isStudent;
+  $('wiz-pubmed-wrap').hidden = isClinical;
+  $('wiz-canvas-wrap').hidden = isClinical;
+  $('wiz-dev-sources').hidden = !isDev;
+  $('wiz-general-sources').hidden = !isGen;
+
+  $('wiz-sources-lead').textContent = isClinical
+    ? 'Clinical mode is offline-only: point Clueless at local clinical guidelines, PDFs or Anki decks on this Mac.'
+    : 'Connect local folders, study decks or workspace tools so answers cite your own material.';
+}
+
+$('wiz-pick-notes').addEventListener('click', async () => {
+  const folder = await api.pickFolder();
+  if (folder) $('wiz-notes-dir').value = folder;
+});
+$('wiz-anki-auto').addEventListener('click', () => { $('wiz-anki').value = 'auto'; });
+$('wiz-pick-anki').addEventListener('click', async () => {
+  const file = await api.pickFile('anki');
+  if (file) $('wiz-anki').value = file;
+});
+
+$('wiz-sync-btn').addEventListener('click', async () => {
+  $('wiz-sync-btn').disabled = true;
+  $('wiz-sync-status').textContent = 'Saving & starting sync…';
+  const saved = await persistWizardSources();
+  if (saved?.error) {
+    $('wiz-sync-status').textContent = `Check fields: ${saved.error}`;
+    $('wiz-sync-btn').disabled = false;
+    return;
+  }
+  await api.runIndex();
+  $('wiz-sync-status').textContent = 'Syncing in background — you can continue.';
+  $('wiz-sync-btn').disabled = false;
+});
+
+api.onIndexStatus((ev) => {
+  if (ev.running) $('wiz-sync-status').textContent = ev.step || 'Syncing…';
+  else if (ev.error) $('wiz-sync-status').textContent = `Sync note: ${ev.error}`;
+  else if (ev.result) $('wiz-sync-status').textContent = 'Context synced and ready.';
+});
 
 // ---------------------------------------------------------------- system check
 
@@ -267,17 +379,38 @@ $('sys-btn').addEventListener('click', async () => {
     $('sys-btn').textContent = 'Test again';
   } else {
     badge($('sys-badge'), 'Not allowed', 'bad');
-    note($('sys-note'), 'No system audio was captured. Allow CluelessTap under System Settings → Privacy & Security → Screen & System Audio Recording, check the volume is up, then test again.', true);
+    note($('sys-note'), 'No system audio was captured. Allow CluelessTap under System Settings → Privacy & Security → Screen & System Audio Recording, then test again.', true);
     api.openPrivacy('audio');
   }
 });
 
-async function refreshScreenStatus() {
+async function refreshOptionalPermissions() {
+  const isClinical = state.profile === 'student' && state.clinicalMode;
+  $('wiz-cal-perm-card').hidden = isClinical;
+
   const { status } = await api.screenStatus();
   if (status === 'granted') badge($('screen-badge'), 'Allowed', 'ok');
-  else badge($('screen-badge'), 'Not allowed', '');
+  else badge($('screen-badge'), 'Optional', '');
+
+  if (!isClinical) {
+    const cal = await api.calendarStatus(false);
+    if (cal?.authorized) {
+      badge($('cal-badge'), 'Allowed', 'ok');
+      $('cal-btn').disabled = true;
+    }
+  }
 }
 $('screen-btn').addEventListener('click', () => api.openPrivacy('screen'));
+$('cal-btn').addEventListener('click', async () => {
+  $('cal-btn').disabled = true;
+  const res = await api.calendarStatus(true);
+  if (res?.authorized) {
+    badge($('cal-badge'), 'Allowed', 'ok');
+  } else {
+    badge($('cal-badge'), res?.status ?? 'Check Settings', '');
+    $('cal-btn').disabled = false;
+  }
+});
 
 // ---------------------------------------------------------------- model
 
@@ -387,17 +520,32 @@ api.onTurn((turn) => {
 
 (async () => {
   const initial = await api.state();
-  // Fallback mirrors server/profiles.py for when the API is still starting.
   state.profiles = initial.profile?.available ?? [
-    { name: 'developer', label: 'Developer', tagline: 'Jira, Confluence and code context, raw logs, every model knob.' },
-    { name: 'medical', label: 'Medical', tagline: 'Identifiers redacted on screen, zero network access, larger type.' },
-    { name: 'general', label: 'General', tagline: 'Simple controls, plain-language answers and high-level recaps.' },
+    { name: 'developer', label: 'Developer', tagline: 'Jira, Confluence, code & PRs, local docs, raw logs and model tuning.' },
+    { name: 'student', label: 'Student', tagline: 'Lectures, research & med school — slides/PDFs, Anki, PubMed, Canvas, plus Clinical mode.' },
+    { name: 'general', label: 'General', tagline: 'Simple controls, plain-language answers, local notes, Notion and calendar.' },
   ];
   state.profile = initial.profile?.name ?? 'general';
+  state.clinicalMode = Boolean(initial.profile?.clinical_mode);
   state.totalMemGB = initial.totalMemGB ?? 16;
-  document.documentElement.dataset.profile = state.profile;
-  // Resume where a closed window left off. A saved step past the welcome page
-  // means consent was given in that earlier session.
+
+  $('wiz-clinical').checked = state.clinicalMode;
+  if (initial.settings) {
+    $('wiz-user-name').value = initial.settings.USER_NAME ?? '';
+    $('wiz-user-role').value = initial.settings.USER_ROLE ?? '';
+    $('wiz-notes-dir').value = initial.settings.LOCAL_NOTES_DIRS ?? '';
+    $('wiz-anki').value = initial.settings.ANKI_PATH ?? '';
+    $('wiz-pubmed').value = initial.settings.PUBMED_QUERY ?? '';
+    $('wiz-canvas-url').value = initial.settings.CANVAS_URL ?? '';
+    $('wiz-jira-site').value = initial.settings.JIRA_SITE ?? '';
+    $('wiz-jira-key').value = initial.settings.JIRA_PROJECT_KEY ?? '';
+    $('wiz-wiki-spaces').value = initial.settings.CONFLUENCE_SPACES ?? '';
+    $('wiz-gh-org').value = initial.settings.GITHUB_ORG ?? '';
+    $('wiz-gh-repos').value = initial.settings.GITHUB_REPOS ?? '';
+    $('wiz-notion-query').value = initial.settings.NOTION_QUERY ?? '';
+  }
+
+  syncProfileNote();
   const saved = Number.parseInt(initial.settings?.ONBOARDING_STEP ?? '0', 10);
   const resume = Number.isFinite(saved) && saved > 0 && saved < steps.length - 1 ? saved : 0;
   $('consent').checked = resume > 0;
