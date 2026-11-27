@@ -15,7 +15,7 @@ uvicorn==0.54.0
 websockets==17.4
 python-dotenv==1.2.4
 certifi==2026.10.23
-pydantic==2.14.3
+pydantic==2.14.4
 numpy==1.26.4
 
 # Not required: torch, faster-whisper, sentence-transformers. Transcription runs
